@@ -67,9 +67,9 @@ fun MessagesScreen(
                             alert = alert,
                             onClick = {
                                 viewModel.markAsRead(alert.id)
-                                val context = "I received a text from ${alert.sender}. " +
-                                    "The message said: \"${alert.content}\". " +
-                                    "Guardian said: ${alert.reason}. What should I do?"
+                                val context = "I received an SMS from ${alert.sender}. " +
+                                    "Guardian flagged it as ${alert.riskLevel}: ${alert.reason}. " +
+                                    "Recommended action: ${alert.action}. What should I do?"
                                 onOpenGuardian(context)
                             }
                         )

@@ -29,4 +29,7 @@ interface MessageDao {
 
     @Query("DELETE FROM chat_messages WHERE timestamp < :before")
     suspend fun deleteOlderThan(before: Long)
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun deleteAll()
 }

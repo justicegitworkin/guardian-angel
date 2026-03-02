@@ -59,8 +59,10 @@ fun GuardianChatScreen(
         topBar = {
             GuardianChatTopBar(
                 isSpeaking = state.isSpeaking,
+                showClearButton = !state.saveHistory && state.messages.isNotEmpty(),
                 onBack = onNavigateBack,
-                onStopSpeaking = viewModel::stopSpeaking
+                onStopSpeaking = viewModel::stopSpeaking,
+                onClear = viewModel::clearConversation
             )
         },
         bottomBar = {
@@ -116,8 +118,10 @@ fun GuardianChatScreen(
 @Composable
 private fun GuardianChatTopBar(
     isSpeaking: Boolean,
+    showClearButton: Boolean,
     onBack: () -> Unit,
-    onStopSpeaking: () -> Unit
+    onStopSpeaking: () -> Unit,
+    onClear: () -> Unit
 ) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = NavyBlue),
@@ -150,6 +154,11 @@ private fun GuardianChatTopBar(
             if (isSpeaking) {
                 IconButton(onClick = onStopSpeaking) {
                     Icon(Icons.Default.VolumeOff, contentDescription = "Stop speaking", tint = WarmGold)
+                }
+            }
+            if (showClearButton) {
+                IconButton(onClick = onClear) {
+                    Icon(Icons.Default.DeleteOutline, contentDescription = "Clear conversation", tint = Color.White.copy(alpha = 0.7f))
                 }
             }
         }
@@ -315,7 +324,7 @@ private fun ChatInputBar(
     onMicClick: () -> Unit
 ) {
     Surface(
-        color = Color.White,
+        color = InputBackground,
         shadowElevation = 8.dp
     ) {
         Row(
@@ -344,8 +353,8 @@ private fun ChatInputBar(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = InputBackground,
+                    unfocusedContainerColor = InputBackground,
                     focusedBorderColor = NavyBlue,
                     unfocusedBorderColor = Color(0xFFBBBBBB),
                     cursorColor = NavyBlue

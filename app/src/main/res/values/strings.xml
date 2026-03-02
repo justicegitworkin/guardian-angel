@@ -18,4 +18,10 @@
     <string name="channel_alerts_description">Scam and safety alerts from Guardian Angel</string>
     <string name="channel_call_name">Call Screening</string>
     <string name="channel_call_description">Guardian Angel call screening notifications</string>
+    <string name="channel_wake_word_name">Wake Word</string>
+    <string name="channel_wake_word_description">Guardian Angel wake word listening service</string>
+    <string name="shortcut_talk_short">Talk to Guardian</string>
+    <string name="shortcut_talk_long">Open Guardian Angel Chat</string>
+    <string name="wake_word_notif_title">Guardian Angel is listening</string>
+    <string name="wake_word_notif_text">Say "Hey Guardian" to open chat hands-free</string>
 </resources>

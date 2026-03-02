@@ -52,15 +52,16 @@ fun OnboardingScreen(
         AnimatedContent(targetState = page, label = "onboarding_page") { currentPage ->
             when (currentPage) {
                 0 -> WelcomePage(onNext = { page = 1 })
-                1 -> PermissionsPage(
+                1 -> PrivacyPage(onNext = { page = 2 })
+                2 -> PermissionsPage(
                     smsPermission = smsPermission,
                     phonePermission = phonePermission,
                     micPermission = micPermission,
                     contactsPermission = contactsPermission,
                     notifPermission = notifPermission,
-                    onNext = { page = 2 }
+                    onNext = { page = 3 }
                 )
-                2 -> SetupPage(
+                3 -> SetupPage(
                     userName = userName,
                     onUserNameChange = { userName = it },
                     apiKey = apiKey,
@@ -330,8 +331,8 @@ private fun SetupPage(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = TextPrimary,
                 unfocusedTextColor = TextPrimary,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
+                focusedContainerColor = InputBackground,
+                unfocusedContainerColor = InputBackground,
                 focusedBorderColor = NavyBlue,
                 unfocusedBorderColor = Color(0xFFBBBBBB),
                 focusedLabelColor = NavyBlue,
@@ -380,8 +381,8 @@ private fun SetupPage(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = TextPrimary,
                 unfocusedTextColor = TextPrimary,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
+                focusedContainerColor = InputBackground,
+                unfocusedContainerColor = InputBackground,
                 focusedBorderColor = NavyBlue,
                 unfocusedBorderColor = Color(0xFFBBBBBB),
                 focusedLabelColor = NavyBlue,

@@ -26,7 +26,8 @@ class NotificationHelper @Inject constructor(
 
         // "Ask Guardian" intent — deep link to chat with context
         val encodedContext = java.net.URLEncoder.encode(
-            "I got a suspicious text from ${alert.sender}: \"${alert.content}\". ${alert.reason}. What should I do?",
+            "I got a suspicious text from ${alert.sender}. " +
+                "Guardian flagged it: ${alert.reason}. What should I do?",
             "UTF-8"
         )
         val chatIntent = Intent(context, MainActivity::class.java).apply {

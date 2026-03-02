@@ -24,4 +24,7 @@ interface CallLogDao {
 
     @Query("UPDATE call_logs SET isBlocked = 1 WHERE callerNumber = :number")
     suspend fun blockNumber(number: String)
+
+    @Query("DELETE FROM call_logs")
+    suspend fun deleteAll()
 }

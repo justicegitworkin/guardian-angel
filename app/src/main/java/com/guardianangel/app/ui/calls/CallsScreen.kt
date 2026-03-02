@@ -245,11 +245,7 @@ private fun CallDetailDialog(
                     Text("Guardian's Summary:", style = MaterialTheme.typography.titleSmall, color = NavyBlue)
                     Text(call.summary, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
                 }
-                if (call.transcript.isNotBlank()) {
-                    HorizontalDivider()
-                    Text("Transcript:", style = MaterialTheme.typography.titleSmall, color = NavyBlue)
-                    Text(call.transcript, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                }
+                // Call transcripts are not stored — privacy-first design
                 Text(
                     "Duration: ${formatDuration(call.durationSeconds)}",
                     style = MaterialTheme.typography.bodySmall,

@@ -2,6 +2,7 @@ package com.guardianangel.app.di
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.guardianangel.app.BuildConfig
 import com.guardianangel.app.data.remote.ClaudeApiService
 import dagger.Module
 import dagger.Provides
@@ -29,11 +30,13 @@ object AppModule {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .addInterceptor(
-                HttpLoggingInterceptor().apply {
-                    level = HttpLoggingInterceptor.Level.BODY
+            .apply {
+                if (BuildConfig.DEBUG) {
+                    addInterceptor(
+                        HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
+                    )
                 }
-            )
+            }
             .build()
     }
 

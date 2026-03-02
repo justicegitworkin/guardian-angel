@@ -22,7 +22,7 @@ class OnboardingViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val textSizePref: StateFlow<String> = prefs.textSizePref
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "NORMAL")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "LARGE")
 
     private val _testResult = MutableStateFlow<String?>(null)
     val testResult: StateFlow<String?> = _testResult.asStateFlow()

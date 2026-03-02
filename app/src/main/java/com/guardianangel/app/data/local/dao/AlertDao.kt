@@ -39,4 +39,7 @@ interface AlertDao {
 
     @Delete
     suspend fun deleteAlert(alert: AlertEntity)
+
+    @Query("DELETE FROM alerts")
+    suspend fun deleteAll()
 }

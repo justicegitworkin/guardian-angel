@@ -38,20 +38,38 @@ class ChatRepository @Inject constructor(
                 .map { ClaudeMessage(role = if (it.isFromUser) "user" else "assistant", content = it.content) }
 
             val messages = history + ClaudeMessage(role = "user", content = userMessage)
+            callGuardianApi(apiKey, messages)
+        }
+    }
 
-            val response = claudeApi.sendMessage(
-                apiKey = apiKey,
-                request = ClaudeRequest(messages = messages, system = GUARDIAN_SYSTEM_PROMPT)
-            )
+    /**
+     * Sends a message using an in-memory context list — nothing is read from or written to Room.
+     * Used when "Save conversation history" is OFF (privacy-first mode).
+     */
+    suspend fun sendInMemory(
+        apiKey: String,
+        userMessage: String,
+        memoryContext: List<ClaudeMessage>
+    ): Result<String> {
+        return runCatching {
+            val messages = memoryContext.takeLast(CONTEXT_WINDOW) +
+                ClaudeMessage(role = "user", content = userMessage)
+            callGuardianApi(apiKey, messages)
+        }
+    }
 
-            if (response.isSuccessful) {
-                response.body()?.text ?: throw Exception("Empty response from Guardian")
-            } else {
-                when (response.code()) {
-                    401 -> throw Exception("Invalid API key")
-                    429 -> throw Exception("Too many requests")
-                    else -> throw Exception("Guardian error: ${response.code()}")
-                }
+    private suspend fun callGuardianApi(apiKey: String, messages: List<ClaudeMessage>): String {
+        val response = claudeApi.sendMessage(
+            apiKey = apiKey,
+            request = ClaudeRequest(messages = messages, system = GUARDIAN_SYSTEM_PROMPT)
+        )
+        return if (response.isSuccessful) {
+            response.body()?.text ?: throw Exception("Empty response from Guardian")
+        } else {
+            when (response.code()) {
+                401 -> throw Exception("Invalid API key")
+                429 -> throw Exception("Too many requests")
+                else -> throw Exception("Guardian error: ${response.code()}")
             }
         }
     }

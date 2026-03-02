@@ -10,6 +10,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,10 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guardianangel.app.data.remote.model.FamilyContact
@@ -35,6 +41,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val testResult by viewModel.testResult.collectAsStateWithLifecycle()
+    val clearDataResult by viewModel.clearDataResult.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     var userName by remember(state.userName) { mutableStateOf(state.userName) }
@@ -44,6 +51,9 @@ fun SettingsScreen(
 
     var showAddFamily by remember { mutableStateOf(false) }
     var showAddTrusted by remember { mutableStateOf(false) }
+    var porcupineKey by remember(state.porcupineKey) { mutableStateOf(state.porcupineKey) }
+    var showPorcupineKey by remember { mutableStateOf(false) }
+    var showClearConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -99,6 +109,42 @@ fun SettingsScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // ── Text Size ────────────────────────────────────────────────
+            SettingsSection(title = "Text Size") {
+                Text(
+                    "Choose how large you'd like the text to appear:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextSizeButton(
+                        label = "Normal",
+                        previewSp = 16f,
+                        isSelected = state.textSizePref == "NORMAL",
+                        onClick = { viewModel.setTextSize("NORMAL") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextSizeButton(
+                        label = "Large",
+                        previewSp = 20f,
+                        isSelected = state.textSizePref == "LARGE",
+                        onClick = { viewModel.setTextSize("LARGE") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextSizeButton(
+                        label = "Extra\nLarge",
+                        previewSp = 26f,
+                        isSelected = state.textSizePref == "EXTRA_LARGE",
+                        onClick = { viewModel.setTextSize("EXTRA_LARGE") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
             // ── Profile ──────────────────────────────────────────────────
             SettingsSection(title = "Your Profile") {
                 OutlinedTextField(
@@ -111,8 +157,8 @@ fun SettingsScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = InputBackground,
+                        unfocusedContainerColor = InputBackground,
                         focusedBorderColor = NavyBlue,
                         unfocusedBorderColor = Color(0xFFBBBBBB),
                         focusedLabelColor = NavyBlue,
@@ -141,8 +187,8 @@ fun SettingsScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = InputBackground,
+                        unfocusedContainerColor = InputBackground,
                         focusedBorderColor = NavyBlue,
                         unfocusedBorderColor = Color(0xFFBBBBBB),
                         focusedLabelColor = NavyBlue,
@@ -267,28 +313,6 @@ fun SettingsScreen(
                 ShieldToggleRow("📧 Email Shield", state.isEmailShieldOn, viewModel::setEmailShield)
             }
 
-            // ── Text Size ────────────────────────────────────────────────
-            SettingsSection(title = "Text Size") {
-                val sizes = listOf("NORMAL" to "Normal", "LARGE" to "Large", "EXTRA_LARGE" to "Extra Large")
-                sizes.forEach { (value, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { viewModel.setTextSize(value) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        RadioButton(
-                            selected = state.textSizePref == value,
-                            onClick = { viewModel.setTextSize(value) },
-                            colors = RadioButtonDefaults.colors(selectedColor = NavyBlue)
-                        )
-                        Text(label, style = MaterialTheme.typography.bodyLarge, color = TextPrimary)
-                    }
-                }
-            }
-
             // ── Family Contacts ──────────────────────────────────────────
             SettingsSection(title = "Family Alert Contacts") {
                 Text(
@@ -342,14 +366,239 @@ fun SettingsScreen(
                 }
             }
 
+            // ── Wake Word ────────────────────────────────────────────────
+            SettingsSection(title = "Wake Word — 'Hey Guardian'") {
+                // Toggle row
+                ShieldToggleRow(
+                    label = "Enable wake word listening",
+                    isOn = state.isWakeWordEnabled,
+                    onToggle = { viewModel.setWakeWordEnabled(it) }
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                // Status row
+                val (statusDot, statusText, statusColor) = when {
+                    !state.isWakeWordEnabled -> Triple("○", "Not running", TextSecondary)
+                    state.porcupineKey.isBlank() -> Triple("⚠", "No access key set", WarningAmber)
+                    else -> Triple("●", "Active — listening", SafeGreen)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(statusDot, style = MaterialTheme.typography.bodyLarge, color = statusColor)
+                    Text(statusText, style = MaterialTheme.typography.bodyMedium, color = statusColor)
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Access key field
+                OutlinedTextField(
+                    value = porcupineKey,
+                    onValueChange = { porcupineKey = it },
+                    label = { Text("Picovoice Access Key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = if (showPorcupineKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedContainerColor = InputBackground,
+                        unfocusedContainerColor = InputBackground,
+                        focusedBorderColor = NavyBlue,
+                        unfocusedBorderColor = Color(0xFFBBBBBB),
+                        focusedLabelColor = NavyBlue,
+                        unfocusedLabelColor = TextSecondary,
+                        cursorColor = NavyBlue
+                    ),
+                    trailingIcon = {
+                        Row {
+                            IconButton(onClick = { showPorcupineKey = !showPorcupineKey }) {
+                                Icon(
+                                    if (showPorcupineKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = "Toggle visibility"
+                                )
+                            }
+                            IconButton(onClick = { viewModel.setPorcupineKey(porcupineKey) }) {
+                                Icon(Icons.Default.Save, contentDescription = "Save key", tint = WarmGold)
+                            }
+                        }
+                    }
+                )
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Get a free access key at console.picovoice.ai. " +
+                    "To use 'Hey Guardian', download the keyword file and place it in the app's assets folder.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+
+            // ── Privacy & Security ───────────────────────────────────────
+            SettingsSection(title = "Privacy & Security") {
+                // AI Processing mode
+                Text(
+                    "AI Processing",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = NavyBlue
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Choose where Guardian analyzes your messages:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(8.dp))
+
+                listOf(
+                    Triple("AUTO", "Auto", "Try on-device first, use cloud if needed"),
+                    Triple("ON", "On-Device Only", "Maximum privacy — no data leaves your phone"),
+                    Triple("OFF", "Cloud Only", "Always use Claude AI in the cloud")
+                ).forEach { (mode, label, desc) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.setPrivacyMode(mode) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        RadioButton(
+                            selected = state.privacyMode == mode,
+                            onClick = { viewModel.setPrivacyMode(mode) },
+                            colors = RadioButtonDefaults.colors(selectedColor = NavyBlue)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(label, style = MaterialTheme.typography.bodyLarge, color = TextPrimary)
+                            Text(desc, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        }
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                // Conversation history
+                ShieldToggleRow(
+                    label = "Save conversation history",
+                    isOn = state.saveHistory,
+                    onToggle = { viewModel.setSaveHistory(it) }
+                )
+                Text(
+                    "When OFF (default): chat stays in memory only and is deleted when you close the app.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                // Cloud message counter
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Cloud messages today", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                    Text(
+                        "${state.cloudMessagesToday}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (state.cloudMessagesToday > 0) WarningAmber else SafeGreen
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Clear all data button
+                if (showClearConfirm) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = ScamRedLight),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "This will permanently delete all alerts, messages, and call logs from this device. Are you sure?",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ScamRed
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { showClearConfirm = false },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Cancel")
+                                }
+                                Button(
+                                    onClick = {
+                                        viewModel.clearAllData()
+                                        showClearConfirm = false
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ScamRed)
+                                ) {
+                                    Text("Delete All", color = Color.White)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { showClearConfirm = true },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, ScamRed)
+                    ) {
+                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = ScamRed)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Clear All Local Data", style = MaterialTheme.typography.labelLarge, color = ScamRed)
+                    }
+                }
+
+                if (clearDataResult == "cleared") {
+                    Text(
+                        "✅ All local data deleted.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SafeGreen
+                    )
+                    LaunchedEffect(clearDataResult) {
+                        kotlinx.coroutines.delay(3000)
+                        viewModel.dismissClearDataResult()
+                    }
+                }
+            }
+
             // ── About ────────────────────────────────────────────────────
             SettingsSection(title = "About Guardian Angel") {
                 Text(
-                    "Guardian Angel v1.0\n\nDesigned to protect seniors from phone and text scams using AI. " +
-                    "Your privacy is our priority — messages are analyzed by Claude AI and never stored by Anthropic beyond your session.",
+                    "Guardian Angel v1.0\n\nDesigned with love to protect seniors from phone and text scams using AI.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
+
+                Spacer(Modifier.height(12.dp))
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SafeGreenLight),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "🔒 Our Privacy Promise",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = SafeGreen
+                        )
+                        Text(
+                            "• Your SMS and call content is NEVER stored on this device or any server.\n" +
+                            "• We store only the AI's risk verdict (SAFE / WARNING / SCAM) — never the original message.\n" +
+                            "• In On-Device mode, nothing leaves your phone.\n" +
+                            "• In Cloud mode, messages are sent to Anthropic's Claude API for analysis. Anthropic does not train on API data.\n" +
+                            "• Your API key is encrypted on-device using hardware-backed Android Keystore.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SafeGreen
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(40.dp))
@@ -372,6 +621,52 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
             )
             Spacer(Modifier.height(12.dp))
             content()
+        }
+    }
+}
+
+@Composable
+private fun TextSizeButton(
+    label: String,
+    previewSp: Float,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val containerColor = if (isSelected) NavyBlue else Color.White
+    val contentColor = if (isSelected) Color.White else NavyBlue
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(80.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = containerColor,
+        border = BorderStroke(
+            width = if (isSelected) 0.dp else 1.5.dp,
+            color = NavyBlue
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Aa",
+                fontSize = previewSp.sp,
+                fontWeight = FontWeight.Bold,
+                color = contentColor,
+                lineHeight = (previewSp * 1.2f).sp
+            )
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = contentColor,
+                textAlign = TextAlign.Center,
+                lineHeight = 13.sp
+            )
         }
     }
 }
@@ -429,8 +724,8 @@ private fun AddContactDialog(
                 val dialogFieldColors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = InputBackground,
+                    unfocusedContainerColor = InputBackground,
                     focusedBorderColor = NavyBlue,
                     unfocusedBorderColor = Color(0xFFBBBBBB),
                     focusedLabelColor = NavyBlue,

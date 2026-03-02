@@ -3,6 +3,7 @@ package com.guardianangel.app.di
 import android.content.Context
 import androidx.room.Room
 import com.guardianangel.app.data.local.AppDatabase
+import com.guardianangel.app.data.local.MIGRATION_1_2
 import com.guardianangel.app.data.local.dao.*
 import dagger.Module
 import dagger.Provides
@@ -22,7 +23,9 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
-        ).build()
+        )
+        .addMigrations(MIGRATION_1_2)
+        .build()
     }
 
     @Provides

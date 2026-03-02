@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!--
+        Only allow HTTPS to api.anthropic.com — no cleartext anywhere.
+        Trust only system CAs (not user-installed root certs) for the API endpoint,
+        preventing MITM attacks via user-installed certificates.
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.anthropic.com</domain>
+        <domain includeSubdomains="false">api.anthropic.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
     </domain-config>
 </network-security-config>

@@ -412,7 +412,7 @@ fun AlertCard(alert: AlertEntity, onClick: () -> Unit) {
             Spacer(Modifier.height(6.dp))
 
             Text(
-                alert.content,
+                alert.reason,
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
                 maxLines = 2,
@@ -422,7 +422,7 @@ fun AlertCard(alert: AlertEntity, onClick: () -> Unit) {
             Spacer(Modifier.height(4.dp))
 
             Text(
-                alert.reason,
+                alert.action,
                 style = MaterialTheme.typography.bodySmall,
                 color = badgeColor,
                 maxLines = 1,

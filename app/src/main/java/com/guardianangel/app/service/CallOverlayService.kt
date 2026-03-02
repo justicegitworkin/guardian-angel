@@ -205,8 +205,7 @@ class CallOverlayService : Service() {
                 callRepository.updateCallLog(
                     current.copy(
                         riskLevel = result.riskLevel,
-                        summary = result.warning ?: "",
-                        transcript = transcript
+                        summary = result.warning ?: ""
                     )
                 )
             }

@@ -7,6 +7,7 @@ import android.provider.ContactsContract
 import android.provider.Telephony
 import android.util.Log
 import com.google.gson.Gson
+import com.guardianangel.app.BuildConfig
 import com.guardianangel.app.data.datastore.UserPreferences
 import com.guardianangel.app.data.repository.AlertRepository
 import com.guardianangel.app.notification.NotificationHelper
@@ -30,7 +31,7 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject lateinit var gson: Gson
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d(TAG, "onReceive fired — action: ${intent.action}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "onReceive fired — action: ${intent.action}")
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
@@ -44,7 +45,7 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
         val body = messages.joinToString("") { it.displayMessageBody ?: "" }
-        Log.d(TAG, "SMS from $sender (${body.length} chars)")
+        if (BuildConfig.DEBUG) Log.d(TAG, "SMS from $sender (${body.length} chars)")
 
         // Scope is local and self-cancelling: cancelled after pendingResult.finish()
         val pendingResult = goAsync()
@@ -55,36 +56,36 @@ class SmsReceiver : BroadcastReceiver() {
             try {
                 val smsShieldOn = userPreferences.isSmsShieldEnabled.first()
                 if (!smsShieldOn) {
-                    Log.d(TAG, "SMS Shield is off — skipping")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "SMS Shield is off — skipping")
                     return@launch
                 }
 
                 if (isInContacts(context, sender)) {
-                    Log.d(TAG, "Sender $sender is in contacts — skipping")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Sender is in contacts — skipping")
                     return@launch
                 }
 
                 val trustedJson = userPreferences.trustedNumbersJson.first()
                 val trusted = gson.fromJson(trustedJson, Array<String>::class.java)
                 if (trusted?.contains(sender) == true) {
-                    Log.d(TAG, "Sender $sender is trusted — skipping")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Sender is trusted — skipping")
                     return@launch
                 }
 
                 if (alertRepository.isBlocked(sender)) {
-                    Log.d(TAG, "Sender $sender is blocked — skipping")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Sender is blocked — skipping")
                     return@launch
                 }
 
                 val apiKey = userPreferences.apiKey.first()
                 if (apiKey.isBlank()) {
-                    Log.w(TAG, "No API key configured — cannot analyse SMS")
+                    if (BuildConfig.DEBUG) Log.w(TAG, "No API key configured — cannot analyse SMS")
                     return@launch
                 }
 
-                Log.d(TAG, "Sending SMS to Claude for analysis")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Sending SMS to Guardian for analysis")
                 alertRepository.analyzeSms(apiKey, sender, body).onSuccess { alert ->
-                    Log.d(TAG, "Analysis result: ${alert.riskLevel} — ${alert.reason}")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Analysis result: ${alert.riskLevel}")
                     if (alert.riskLevel == "WARNING" || alert.riskLevel == "SCAM") {
                         notificationHelper.showSmsAlert(alert)
 
@@ -94,7 +95,7 @@ class SmsReceiver : BroadcastReceiver() {
                         }
                     }
                 }.onFailure { e ->
-                    Log.e(TAG, "SMS analysis failed: ${e.message}", e)
+                    if (BuildConfig.DEBUG) Log.e(TAG, "SMS analysis failed: ${e.message}", e)
                 }
             } finally {
                 pendingResult.finish()

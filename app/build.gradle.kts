@@ -24,11 +24,15 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 
@@ -43,6 +47,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -105,6 +110,12 @@ dependencies {
 
     // Accompanist Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
+    // Porcupine wake word detection
+    implementation("ai.picovoice:porcupine-android:3.0.2")
+
+    // Gemini Nano on-device AI — accessed via reflection at runtime, so no compile dependency.
+    // OnDeviceAIService.checkCompatibility() returns NOT_SUPPORTED on unsupported devices.
 
     // Testing
     testImplementation("junit:junit:4.13.2")
