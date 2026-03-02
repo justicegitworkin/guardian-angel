@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(JAVA_HOME=\"/mnt/c/Program Files/Android/Android Studio/jbr\"\nGRADLE=\"/mnt/c/Users/steve/.gradle/wrapper/dists/gradle-8.11.1-bin/bpt9gzteqjrbo1mjrsomdt32c/gradle-8.11.1/bin/gradle\"\nexport JAVA_HOME\nexport PATH=\"$JAVA_HOME/bin:$PATH\"\ncd /home/steve/guardian-angel\n\"$GRADLE\" wrapper --gradle-version 8.4 2>&1 | tail -20)",
+      "Bash(JAVA_BIN=\"/mnt/c/Program Files/Android/Android Studio/jbr/bin\"\nGRADLE_BIN=\"/mnt/c/Users/steve/.gradle/wrapper/dists/gradle-8.11.1-bin/bpt9gzteqjrbo1mjrsomdt32c/gradle-8.11.1/bin/gradle\"\nexport PATH=\"$JAVA_BIN:$PATH\"\nexport JAVA_HOME=\"/mnt/c/Program Files/Android/Android Studio/jbr\"\n\"$GRADLE_BIN\" wrapper --gradle-version 8.4 2>&1 | tail -20)",
+      "Bash(JAVA_HOME='/mnt/c/Program Files/Android/Android Studio/jbr' PATH=\"/mnt/c/Program Files/Android/Android Studio/jbr/bin:$PATH\" '/mnt/c/Users/steve/.gradle/wrapper/dists/gradle-8.11.1-bin/bpt9gzteqjrbo1mjrsomdt32c/gradle-8.11.1/bin/gradle' wrapper --gradle-version 8.4 2>&1 | tail -20)",
+      "Bash(java.exe -version 2>&1)",
+      "Bash(sudo apt-get update -qq && sudo apt-get install -y openjdk-17-jdk 2>&1 | tail -5)",
+      "Bash(cat > /home/steve/guardian-angel/gradle/wrapper/gradle-wrapper.properties << 'EOF'\ndistributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.4-bin.zip\nnetworkTimeout=10000\nvalidateDistributionUrl=true\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\nEOF\necho \"done\")",
+      "Bash(powershell.exe -Command \"\n# Map WSL filesystem to a drive letter\n\\\\$null = net use G: '\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu\\\\\\\\home\\\\\\\\steve\\\\\\\\guardian-angel' 2>&1\n\n# Set up env\n\\\\$env:JAVA_HOME = 'C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr'\n\\\\$env:PATH = 'C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\\\\bin;' + \\\\$env:PATH\n\\\\$env:ANDROID_HOME = 'C:\\\\Users\\\\steve\\\\AppData\\\\Local\\\\Android\\\\Sdk'\n\\\\$env:ANDROID_SDK_ROOT = 'C:\\\\Users\\\\steve\\\\AppData\\\\Local\\\\Android\\\\Sdk'\n\nSet-Location G:\\\\\nWrite-Host 'Working directory:' \\\\$PWD\nWrite-Host 'JAVA_HOME:' \\\\$env:JAVA_HOME\n\n# Run gradlew.bat\n& 'G:\\\\gradlew.bat' --version 2>&1\n\" 2>&1 | tail -20)",
+      "Bash(tar -tzf /tmp/jdk17.tar.gz)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"C:\\\\Temp\\\\build_guardian2.ps1\" 2>&1)"
+    ]
+  }
+}
