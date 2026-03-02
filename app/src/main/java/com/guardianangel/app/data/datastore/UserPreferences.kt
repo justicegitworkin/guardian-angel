@@ -44,6 +44,11 @@ class UserPreferences @Inject constructor(
         val KEY_SAVE_CONVERSATION = booleanPreferencesKey("save_conversation_history")
         val KEY_CLOUD_MSG_COUNT = intPreferencesKey("cloud_messages_today")
         val KEY_CLOUD_MSG_DATE = stringPreferencesKey("cloud_messages_date") // "yyyy-MM-dd"
+        // Analytics (local only, counts only, no personal data)
+        val KEY_ANALYTICS_CHAT_SESSIONS = intPreferencesKey("analytics_chat_sessions")
+        val KEY_ANALYTICS_SMS_ALERTS = intPreferencesKey("analytics_sms_alerts")
+        val KEY_ANALYTICS_CALLS_SCREENED = intPreferencesKey("analytics_calls_screened")
+        val KEY_ANALYTICS_CALL_FRIEND_TAPS = intPreferencesKey("analytics_call_friend_taps")
     }
 
     // Single error-handled upstream shared by all derived flows
@@ -70,6 +75,11 @@ class UserPreferences @Inject constructor(
     val saveConversationHistory: Flow<Boolean> = safeData.map { it[KEY_SAVE_CONVERSATION] ?: false }
     val cloudMessagesToday: Flow<Int> = safeData.map { it[KEY_CLOUD_MSG_COUNT] ?: 0 }
     val cloudMessagesDate: Flow<String> = safeData.map { it[KEY_CLOUD_MSG_DATE] ?: "" }
+    // Analytics
+    val chatSessionCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_CHAT_SESSIONS] ?: 0 }
+    val smsAlertCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_SMS_ALERTS] ?: 0 }
+    val callsScreenedCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_CALLS_SCREENED] ?: 0 }
+    val callFriendTapCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_CALL_FRIEND_TAPS] ?: 0 }
 
     suspend fun setUserName(name: String) { dataStore.edit { it[KEY_USER_NAME] = name } }
     suspend fun setApiKey(key: String) {
@@ -100,5 +110,19 @@ class UserPreferences @Inject constructor(
             it[KEY_CLOUD_MSG_COUNT] = 0
             it[KEY_CLOUD_MSG_DATE] = ""
         }
+    }
+
+    // Analytics increment helpers
+    suspend fun recordChatSession() {
+        dataStore.edit { it[KEY_ANALYTICS_CHAT_SESSIONS] = (it[KEY_ANALYTICS_CHAT_SESSIONS] ?: 0) + 1 }
+    }
+    suspend fun recordSmsAlert() {
+        dataStore.edit { it[KEY_ANALYTICS_SMS_ALERTS] = (it[KEY_ANALYTICS_SMS_ALERTS] ?: 0) + 1 }
+    }
+    suspend fun recordCallScreened() {
+        dataStore.edit { it[KEY_ANALYTICS_CALLS_SCREENED] = (it[KEY_ANALYTICS_CALLS_SCREENED] ?: 0) + 1 }
+    }
+    suspend fun recordCallFriendTap() {
+        dataStore.edit { it[KEY_ANALYTICS_CALL_FRIEND_TAPS] = (it[KEY_ANALYTICS_CALL_FRIEND_TAPS] ?: 0) + 1 }
     }
 }

@@ -35,7 +35,12 @@ data class SettingsUiState(
     // Privacy
     val privacyMode: String = "AUTO",       // "AUTO" | "ON" | "OFF"
     val saveHistory: Boolean = false,
-    val cloudMessagesToday: Int = 0
+    val cloudMessagesToday: Int = 0,
+    // Analytics
+    val chatSessions: Int = 0,
+    val smsAlerts: Int = 0,
+    val callsScreened: Int = 0,
+    val callFriendTaps: Int = 0
 )
 
 // Intermediate typed structs to avoid Array<Any> index casting in combine
@@ -62,6 +67,13 @@ private data class PrivacyPrefs(
     val privacyMode: String,
     val saveHistory: Boolean,
     val cloudMsgCount: Int
+)
+
+private data class AnalyticsPrefs(
+    val chatSessions: Int,
+    val smsAlerts: Int,
+    val callsScreened: Int,
+    val callFriendTaps: Int
 )
 
 @HiltViewModel
@@ -103,8 +115,15 @@ class SettingsViewModel @Inject constructor(
             prefs.saveConversationHistory,
             prefs.cloudMessagesToday,
             ::PrivacyPrefs
+        ),
+        combine(
+            prefs.chatSessionCount,
+            prefs.smsAlertCount,
+            prefs.callsScreenedCount,
+            prefs.callFriendTapCount,
+            ::AnalyticsPrefs
         )
-    ) { core, ext, wake, privacy ->
+    ) { core, ext, wake, privacy, analytics ->
         SettingsUiState(
             userName = core.userName,
             apiKey = core.apiKey,
@@ -122,7 +141,11 @@ class SettingsViewModel @Inject constructor(
             porcupineKey = wake.porcupineKey,
             privacyMode = privacy.privacyMode,
             saveHistory = privacy.saveHistory,
-            cloudMessagesToday = privacy.cloudMsgCount
+            cloudMessagesToday = privacy.cloudMsgCount,
+            chatSessions = analytics.chatSessions,
+            smsAlerts = analytics.smsAlerts,
+            callsScreened = analytics.callsScreened,
+            callFriendTaps = analytics.callFriendTaps
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 

@@ -124,7 +124,9 @@ class AlertRepository @Inject constructor(
                 reason = onDeviceResult.reason,
                 action = onDeviceResult.action
             )
-            return Result.success(entity.copy(id = alertDao.insertAlert(entity)))
+            val id = alertDao.insertAlert(entity)
+            if (entity.riskLevel != "SAFE") userPreferences.recordSmsAlert()
+            return Result.success(entity.copy(id = id))
         }
 
         // Fall back to Claude cloud API
@@ -154,7 +156,9 @@ class AlertRepository @Inject constructor(
                 reason = result.reason,
                 action = result.action
             )
-            entity.copy(id = alertDao.insertAlert(entity))
+            val id = alertDao.insertAlert(entity)
+            if (entity.riskLevel != "SAFE") userPreferences.recordSmsAlert()
+            entity.copy(id = id)
         }
     }
 }

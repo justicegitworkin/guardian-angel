@@ -34,6 +34,9 @@ class GuardianCallScreeningService : CallScreeningService() {
                     return@launch
                 }
 
+                // Record analytics — this call is being screened
+                userPreferences.recordCallScreened()
+
                 // Check local blocklist first — reject immediately
                 if (alertRepository.isBlocked(number)) {
                     callRepository.insertCallLog(

@@ -2,8 +2,11 @@ package com.guardianangel.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.guardianangel.app.data.datastore.UserPreferences
 import com.guardianangel.app.data.local.entity.AlertEntity
+import com.guardianangel.app.data.remote.model.FamilyContact
 import com.guardianangel.app.data.repository.AlertRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -16,7 +19,8 @@ data class HomeUiState(
     val isCallShieldOn: Boolean = true,
     val isEmailShieldOn: Boolean = true,
     val recentAlerts: List<AlertEntity> = emptyList(),
-    val scamsBlockedThisMonth: Int = 0
+    val scamsBlockedThisMonth: Int = 0,
+    val familyContacts: List<FamilyContact> = emptyList()
 ) {
     val allShieldsOn: Boolean get() = isSmsShieldOn && isCallShieldOn && isEmailShieldOn
 }
@@ -24,22 +28,36 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val prefs: UserPreferences,
-    private val alertRepository: AlertRepository
+    private val alertRepository: AlertRepository,
+    private val gson: Gson
 ) : ViewModel() {
 
+    private val familyType = object : TypeToken<List<FamilyContact>>() {}.type
+
+    private data class HomeShields(
+        val name: String, val sms: Boolean, val call: Boolean, val email: Boolean
+    )
+
     val uiState: StateFlow<HomeUiState> = combine(
-        prefs.userName,
-        prefs.isSmsShieldEnabled,
-        prefs.isCallShieldEnabled,
-        prefs.isEmailShieldEnabled,
-        alertRepository.getRecentAlerts(10)
-    ) { name, sms, call, email, alerts ->
+        combine(
+            prefs.userName,
+            prefs.isSmsShieldEnabled,
+            prefs.isCallShieldEnabled,
+            prefs.isEmailShieldEnabled
+        ) { name, sms, call, email -> HomeShields(name, sms, call, email) },
+        alertRepository.getRecentAlerts(10),
+        prefs.familyContactsJson
+    ) { shields, alerts, familyJson ->
+        val contacts = runCatching {
+            gson.fromJson<List<FamilyContact>>(familyJson, familyType) ?: emptyList()
+        }.getOrDefault(emptyList())
         HomeUiState(
-            userName = name,
-            isSmsShieldOn = sms,
-            isCallShieldOn = call,
-            isEmailShieldOn = email,
-            recentAlerts = alerts
+            userName = shields.name,
+            isSmsShieldOn = shields.sms,
+            isCallShieldOn = shields.call,
+            isEmailShieldOn = shields.email,
+            recentAlerts = alerts,
+            familyContacts = contacts
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -66,4 +84,5 @@ class HomeViewModel @Inject constructor(
     fun setCallShield(enabled: Boolean) { viewModelScope.launch { prefs.setCallShield(enabled) } }
     fun setEmailShield(enabled: Boolean) { viewModelScope.launch { prefs.setEmailShield(enabled) } }
     fun markAlertRead(alertId: Long) { viewModelScope.launch { alertRepository.markAsRead(alertId) } }
+    fun recordCallFriendTap() { viewModelScope.launch { prefs.recordCallFriendTap() } }
 }

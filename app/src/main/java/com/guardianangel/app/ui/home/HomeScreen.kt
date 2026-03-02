@@ -1,6 +1,8 @@
 package com.guardianangel.app.ui.home
 
 import android.app.role.RoleManager
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guardianangel.app.data.local.entity.AlertEntity
+import com.guardianangel.app.data.remote.model.FamilyContact
 import com.guardianangel.app.ui.theme.*
 import com.guardianangel.app.util.formatTime
 
@@ -166,6 +169,24 @@ fun HomeScreen(
                         emoji = "📧",
                         isOn = state.isEmailShieldOn,
                         onToggle = { viewModel.setEmailShield(it) }
+                    )
+                }
+            }
+
+            // Call a Friend
+            if (state.familyContacts.isNotEmpty()) {
+                item {
+                    Text(
+                        "Call a Friend",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = NavyBlue
+                    )
+                }
+                item {
+                    CallAFriendRow(
+                        contacts = state.familyContacts,
+                        context = context,
+                        onTap = { viewModel.recordCallFriendTap() }
                     )
                 }
             }
@@ -351,6 +372,54 @@ private fun AllClearCard() {
                 style = MaterialTheme.typography.bodyLarge,
                 color = SafeGreen
             )
+        }
+    }
+}
+
+@Composable
+private fun CallAFriendRow(
+    contacts: List<FamilyContact>,
+    context: android.content.Context,
+    onTap: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        contacts.take(3).forEach { contact ->
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        onTap()
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contact.number}"))
+                        context.startActivity(intent)
+                    },
+                colors = CardDefaults.cardColors(containerColor = NavyBlue),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("📞", fontSize = 24.sp)
+                    Text(
+                        contact.nickname,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        // Fill empty slots so cards don't stretch weirdly when < 3 contacts
+        repeat((3 - contacts.size).coerceAtLeast(0)) {
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }

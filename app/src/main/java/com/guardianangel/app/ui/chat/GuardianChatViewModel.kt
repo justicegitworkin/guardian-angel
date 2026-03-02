@@ -118,6 +118,7 @@ class GuardianChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(inputText = "", isLoading = true) }
+            prefs.recordChatSession()
 
             val key = apiKey.value
             val save = saveHistory.value

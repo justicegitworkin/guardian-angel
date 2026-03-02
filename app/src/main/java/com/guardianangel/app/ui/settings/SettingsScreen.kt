@@ -568,6 +568,43 @@ fun SettingsScreen(
                 }
             }
 
+            // ── Usage Stats ──────────────────────────────────────────────
+            SettingsSection(title = "Usage Stats") {
+                Text(
+                    "All counts are stored only on this device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(12.dp))
+                listOf(
+                    Triple("💬", "Guardian Chat Messages", state.chatSessions),
+                    Triple("🚨", "SMS Alerts Triggered", state.smsAlerts),
+                    Triple("📞", "Calls Screened", state.callsScreened),
+                    Triple("👥", "Call a Friend Taps", state.callFriendTaps)
+                ).forEach { (emoji, label, count) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(emoji, style = MaterialTheme.typography.bodyLarge)
+                            Text(label, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                        }
+                        Text(
+                            "$count",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = NavyBlue
+                        )
+                    }
+                }
+            }
+
             // ── About ────────────────────────────────────────────────────
             SettingsSection(title = "About Guardian Angel") {
                 Text(
