@@ -37,6 +37,9 @@
     <!-- Vibrate for notifications -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Battery optimization exemption (for reliable SMS background reception) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:name=".GuardianAngelApp"
         android:allowBackup="true"

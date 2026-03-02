@@ -1,5 +1,12 @@
 package com.guardianangel.app.ui.settings
 
+import android.app.role.RoleManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -28,12 +36,30 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val testResult by viewModel.testResult.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
     var userName by remember(state.userName) { mutableStateOf(state.userName) }
     var apiKey by remember(state.apiKey) { mutableStateOf(state.apiKey) }
     var showApiKey by remember { mutableStateOf(false) }
+    var isCallScreeningActive by remember { mutableStateOf(false) }
 
     var showAddFamily by remember { mutableStateOf(false) }
     var showAddTrusted by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val rm = context.getSystemService(RoleManager::class.java)
+            isCallScreeningActive = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+        }
+    }
+
+    val roleRequestLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val rm = context.getSystemService(RoleManager::class.java)
+            isCallScreeningActive = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+        }
+    }
 
     if (showAddFamily) {
         AddContactDialog(
@@ -82,6 +108,17 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = NavyBlue,
+                        unfocusedBorderColor = Color(0xFFBBBBBB),
+                        focusedLabelColor = NavyBlue,
+                        unfocusedLabelColor = TextSecondary,
+                        cursorColor = NavyBlue
+                    ),
                     trailingIcon = {
                         IconButton(onClick = { viewModel.setUserName(userName) }) {
                             Icon(Icons.Default.Save, contentDescription = "Save name", tint = WarmGold)
@@ -101,6 +138,17 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = NavyBlue,
+                        unfocusedBorderColor = Color(0xFFBBBBBB),
+                        focusedLabelColor = NavyBlue,
+                        unfocusedLabelColor = TextSecondary,
+                        cursorColor = NavyBlue
+                    ),
                     trailingIcon = {
                         Row {
                             IconButton(onClick = { showApiKey = !showApiKey }) {
@@ -139,6 +187,76 @@ fun SettingsScreen(
                         else -> Pair(WarningAmber, "⚠️ Connection failed. Check your internet.")
                     }
                     Text(msg, style = MaterialTheme.typography.bodyMedium, color = color)
+                }
+            }
+
+            // ── Call Screening Setup ──────────────────────────────────────
+            SettingsSection(title = "Call Screening Setup") {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    Text(
+                        "Call screening requires Android 10 or later.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                } else if (isCallScreeningActive) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SafeGreen)
+                        Text(
+                            "Call screening is active",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = SafeGreen
+                        )
+                    }
+                } else {
+                    Text(
+                        "Guardian Angel needs to be set as your call screening app to review incoming calls.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            val rm = context.getSystemService(RoleManager::class.java)
+                            roleRequestLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NavyBlue)
+                    ) {
+                        Icon(Icons.Default.Phone, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Set Up Call Screening", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+
+            // ── Battery Optimization ──────────────────────────────────────
+            SettingsSection(title = "Battery & Background") {
+                Text(
+                    "For SMS detection to work on all devices, Guardian Angel should be excluded from battery optimization.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                            )
+                        }.onFailure {
+                            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Icon(Icons.Default.BatteryFull, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Disable Battery Optimization", style = MaterialTheme.typography.labelLarge)
                 }
             }
 
@@ -308,13 +426,25 @@ private fun AddContactDialog(
         title = { Text(title, style = MaterialTheme.typography.headlineSmall, color = NavyBlue) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val dialogFieldColors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = NavyBlue,
+                    unfocusedBorderColor = Color(0xFFBBBBBB),
+                    focusedLabelColor = NavyBlue,
+                    unfocusedLabelColor = TextSecondary,
+                    cursorColor = NavyBlue
+                )
                 if (hasNickname) {
                     OutlinedTextField(
                         value = nickname,
                         onValueChange = { nickname = it },
                         label = { Text("Nickname (e.g. Daughter Sarah)") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        colors = dialogFieldColors
                     )
                 }
                 OutlinedTextField(
@@ -323,7 +453,8 @@ private fun AddContactDialog(
                     label = { Text("Phone number") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    colors = dialogFieldColors
                 )
             }
         },

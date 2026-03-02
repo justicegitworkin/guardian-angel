@@ -1,5 +1,9 @@
 package com.guardianangel.app.ui.home
 
+import android.app.role.RoleManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -17,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,6 +41,24 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var isCallScreeningActive by remember { mutableStateOf(true) } // assume active until checked
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val rm = context.getSystemService(RoleManager::class.java)
+            isCallScreeningActive = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+        }
+    }
+
+    val roleRequestLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val rm = context.getSystemService(RoleManager::class.java)
+            isCallScreeningActive = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+        }
+    }
 
     Scaffold(
         containerColor = WarmWhite,
@@ -67,6 +90,46 @@ fun HomeScreen(
                     allShieldsOn = state.allShieldsOn,
                     onClick = onNavigateToGuardian
                 )
+            }
+
+            // Call screening warning banner
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isCallScreeningActive) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = WarningAmberLight),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("⚠️", fontSize = 24.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Call screening not set up",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = WarningAmber
+                                )
+                                Text(
+                                    "Calls are not being screened for scams",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val rm = context.getSystemService(RoleManager::class.java)
+                                    roleRequestLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
+                                },
+                                border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber)
+                            ) {
+                                Text("Fix This", style = MaterialTheme.typography.labelLarge, color = WarningAmber)
+                            }
+                        }
+                    }
+                }
             }
 
             // Shield status cards

@@ -326,7 +326,18 @@ private fun SetupPage(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             leadingIcon = { Text("👤", fontSize = 20.sp) },
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = NavyBlue,
+                unfocusedBorderColor = Color(0xFFBBBBBB),
+                focusedLabelColor = NavyBlue,
+                unfocusedLabelColor = TextSecondary,
+                cursorColor = NavyBlue
+            )
         )
 
         Spacer(Modifier.height(24.dp))
@@ -365,7 +376,18 @@ private fun SetupPage(
                     )
                 }
             },
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = NavyBlue,
+                unfocusedBorderColor = Color(0xFFBBBBBB),
+                focusedLabelColor = NavyBlue,
+                unfocusedLabelColor = TextSecondary,
+                cursorColor = NavyBlue
+            )
         )
 
         Spacer(Modifier.height(12.dp))

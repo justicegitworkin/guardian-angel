@@ -340,7 +340,16 @@ private fun ChatInputBar(
                 },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 maxLines = 4,
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = NavyBlue,
+                    unfocusedBorderColor = Color(0xFFBBBBBB),
+                    cursorColor = NavyBlue
+                )
             )
 
             // Mic button
