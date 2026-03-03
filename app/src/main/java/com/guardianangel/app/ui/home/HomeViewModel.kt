@@ -91,6 +91,7 @@ class HomeViewModel @Inject constructor(
     fun setSmsShield(enabled: Boolean) { viewModelScope.launch { prefs.setSmsShield(enabled) } }
     fun setCallShield(enabled: Boolean) { viewModelScope.launch { prefs.setCallShield(enabled) } }
     fun setEmailShield(enabled: Boolean) { viewModelScope.launch { prefs.setEmailShield(enabled) } }
+    fun enableAllShields() { viewModelScope.launch { prefs.setSmsShield(true); prefs.setCallShield(true); prefs.setEmailShield(true) } }
     fun markAlertRead(alertId: Long) { viewModelScope.launch { alertRepository.markAsRead(alertId) } }
     fun recordCallFriendTap() { viewModelScope.launch { prefs.recordCallFriendTap() } }
 

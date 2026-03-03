@@ -1,17 +1,15 @@
 package com.guardianangel.app.ui.home
 
-import android.app.role.RoleManager
+import android.content.Context
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.net.Uri
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,19 +21,56 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.guardianangel.app.data.local.entity.AlertEntity
-import com.guardianangel.app.data.local.entity.ScamRuleEntity
-import com.guardianangel.app.data.remote.model.FamilyContact
 import com.guardianangel.app.ui.theme.*
 import com.guardianangel.app.util.formatTime
+import kotlin.math.sqrt
 
+// ── Shake detector ────────────────────────────────────────────────────────────
+
+private const val SHAKE_THRESHOLD = 14f   // m/s² net over gravity
+private const val SHAKE_DEBOUNCE_MS = 2_000L
+
+@Composable
+private fun ShakeDetector(onShake: () -> Unit) {
+    val context = LocalContext.current
+    val callback by rememberUpdatedState(onShake)
+    var lastShakeTime by remember { mutableLongStateOf(0L) }
+
+    DisposableEffect(Unit) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+            ?: return@DisposableEffect onDispose {}
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                val x = event.values[0]; val y = event.values[1]; val z = event.values[2]
+                val net = sqrt((x * x + y * y + z * z).toDouble()).toFloat() - SensorManager.GRAVITY_EARTH
+                if (net > SHAKE_THRESHOLD) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastShakeTime > SHAKE_DEBOUNCE_MS) {
+                        lastShakeTime = now
+                        callback()
+                    }
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+        }
+        sensorManager.registerListener(listener, accel, SensorManager.SENSOR_DELAY_UI)
+        onDispose { sensorManager.unregisterListener(listener) }
+    }
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToGuardian: () -> Unit,
@@ -44,656 +79,445 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val intelState by viewModel.intelState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    var isCallScreeningActive by remember { mutableStateOf(true) } // assume active until checked
-    var showThreatDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val rm = context.getSystemService(RoleManager::class.java)
-            isCallScreeningActive = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
+    var showStatusDialog by remember { mutableStateOf(false) }
+    var showFeaturesSheet by remember { mutableStateOf(false) }
+    var showSecurityConfirm by remember { mutableStateOf(false) }
+    var showNoContactsDialog by remember { mutableStateOf(false) }
+
+    // Shake → open Guardian chat
+    ShakeDetector(onShake = onNavigateToGuardian)
+
+    // Auto-dismiss security confirmation after 2 s
+    LaunchedEffect(showSecurityConfirm) {
+        if (showSecurityConfirm) {
+            kotlinx.coroutines.delay(2_000)
+            showSecurityConfirm = false
         }
     }
-
-    val roleRequestLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { _ ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val rm = context.getSystemService(RoleManager::class.java)
-            isCallScreeningActive = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
-        }
-    }
-
-    if (showThreatDialog) {
-        ThreatListDialog(
-            threats = intelState.threats,
-            onDismiss = { showThreatDialog = false }
-        )
-    }
-
-    Scaffold(
-        containerColor = WarmWhite,
-        topBar = {
-            HomeTopBar(
-                userName = state.userName,
-                onSettingsClick = onNavigateToSettings
-            )
-        },
-        bottomBar = {
-            HomeBottomBar(
-                onCalls = onNavigateToCalls,
-                onMessages = onNavigateToMessages,
-                onSettings = onNavigateToSettings
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
-        ) {
-            // Big Guardian button
-            item {
-                GuardianCallButton(
-                    allShieldsOn = state.allShieldsOn,
-                    onClick = onNavigateToGuardian
-                )
-            }
-
-            // Call screening warning banner
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isCallScreeningActive) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = WarningAmberLight),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text("⚠️", fontSize = 24.sp)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Call screening not set up",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = WarningAmber
-                                )
-                                Text(
-                                    "Calls are not being screened for scams",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondary
-                                )
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    val rm = context.getSystemService(RoleManager::class.java)
-                                    roleRequestLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
-                                },
-                                border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber)
-                            ) {
-                                Text("Fix This", style = MaterialTheme.typography.labelLarge, color = WarningAmber)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Shield status cards
-            item {
-                Text(
-                    "Protection Shields",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = NavyBlue
-                )
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ShieldCard(
-                        modifier = Modifier.weight(1f),
-                        label = "Call",
-                        emoji = "📞",
-                        isOn = state.isCallShieldOn,
-                        onToggle = { viewModel.setCallShield(it) }
-                    )
-                    ShieldCard(
-                        modifier = Modifier.weight(1f),
-                        label = "SMS",
-                        emoji = "💬",
-                        isOn = state.isSmsShieldOn,
-                        onToggle = { viewModel.setSmsShield(it) }
-                    )
-                    ShieldCard(
-                        modifier = Modifier.weight(1f),
-                        label = "Email",
-                        emoji = "📧",
-                        isOn = state.isEmailShieldOn,
-                        onToggle = { viewModel.setEmailShield(it) }
-                    )
-                }
-            }
-
-            // Intelligence badge — always shown (shows "no data" state when server not configured)
-            item {
-                IntelligenceBadge(
-                    lastSyncMs    = intelState.lastSyncMs,
-                    threatCount   = intelState.threats.size,
-                    onClick       = { showThreatDialog = true }
-                )
-            }
-
-            // Call a Friend
-            if (state.familyContacts.isNotEmpty()) {
-                item {
-                    Text(
-                        "Call a Friend",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = NavyBlue
-                    )
-                }
-                item {
-                    CallAFriendRow(
-                        contacts = state.familyContacts,
-                        context = context,
-                        onTap = { viewModel.recordCallFriendTap() }
-                    )
-                }
-            }
-
-            // Recent alerts header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Recent Alerts",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = NavyBlue
-                    )
-                    TextButton(onClick = onNavigateToMessages) {
-                        Text("See all", style = MaterialTheme.typography.bodyLarge, color = WarmGold)
-                    }
-                }
-            }
-
-            if (state.recentAlerts.isEmpty()) {
-                item { AllClearCard() }
-            } else {
-                items(state.recentAlerts, key = { it.id }) { alert ->
-                    AlertCard(
-                        alert = alert,
-                        onClick = {
-                            viewModel.markAlertRead(alert.id)
-                            if (alert.type == "SMS") onNavigateToMessages() else onNavigateToCalls()
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HomeTopBar(userName: String, onSettingsClick: () -> Unit) {
-    TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = NavyBlue),
-        title = {
-            Column {
-                Text(
-                    text = if (userName.isNotBlank()) "Hello, $userName 👋" else "Hello! 👋",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
-                )
-                Text(
-                    text = "Guardian Angel is watching over you",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = WarmGoldLight
-                )
-            }
-        },
-        actions = {
-            IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
-            }
-        }
-    )
-}
-
-@Composable
-private fun GuardianCallButton(allShieldsOn: Boolean, onClick: () -> Unit) {
-    val pulseColor = if (allShieldsOn) PulseGreen else PulseAmber
-
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        // Pulse ring
-        Box(
-            modifier = Modifier
-                .size((140 * 1.3).dp)
-                .scale(scale)
-                .clip(CircleShape)
-                .background(pulseColor.copy(alpha = 0.2f))
-        )
-
-        // Main button
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .clip(CircleShape)
-                .background(NavyBlue)
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Default.Mic,
-                    contentDescription = "Talk to Guardian Angel",
-                    tint = WarmGold,
-                    modifier = Modifier.size(48.dp)
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Talk to\nGuardian",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    fontSize = 13.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ShieldCard(
-    modifier: Modifier = Modifier,
-    label: String,
-    emoji: String,
-    isOn: Boolean,
-    onToggle: (Boolean) -> Unit
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isOn) NavyBlue else LightSurface
-        ),
-        shape = RoundedCornerShape(16.dp)
+            .fillMaxSize()
+            .background(NavyBlue)
     ) {
         Column(
             modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(emoji, fontSize = 24.sp)
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (isOn) Color.White else TextSecondary
-            )
-            Switch(
-                checked = isOn,
-                onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = WarmGold,
-                    checkedTrackColor = NavyBlueLight,
-                    uncheckedThumbColor = TextSecondary,
-                    uncheckedTrackColor = LightSurface
-                )
-            )
-        }
-    }
-}
 
-@Composable
-private fun AllClearCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SafeGreenLight),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text("🛡️", fontSize = 36.sp)
-            Text(
-                text = "All clear! Guardian Angel is watching over you",
-                style = MaterialTheme.typography.bodyLarge,
-                color = SafeGreen
-            )
-        }
-    }
-}
-
-@Composable
-private fun IntelligenceBadge(
-    lastSyncMs: Long,
-    threatCount: Int,
-    onClick: () -> Unit
-) {
-    val syncLabel = when {
-        lastSyncMs == 0L  -> "Not yet synced — add server URL in Settings"
-        else -> {
-            val minAgo = ((System.currentTimeMillis() - lastSyncMs) / 60_000).toInt()
-            when {
-                minAgo < 1   -> "Updated just now"
-                minAgo < 60  -> "Updated $minAgo min ago"
-                minAgo < 120 -> "Updated 1 hour ago"
-                else         -> "Updated ${minAgo / 60} hours ago"
-            }
-        }
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = NavyBlue.copy(alpha = 0.08f)),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // ── 1. Top bar ─────────────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    "🛡️ Scam Intelligence",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = NavyBlue
+                    text = "Guardian Angel",
+                    color = WarmGold,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    syncLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-                if (threatCount > 0) {
-                    Text(
-                        "📋 $threatCount active threat alert${if (threatCount > 1) "s" else ""} loaded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = WarningAmber
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = onNavigateToSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = WarmGold,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = "View threats",
-                tint = NavyBlue,
-                modifier = Modifier.size(20.dp)
+
+            // ── 2. Status badge ────────────────────────────────────────────
+            StatusBadge(intelState = intelState, onClick = { showStatusDialog = true })
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ── 3. Push-to-talk button ─────────────────────────────────────
+            PushToTalkButton(onClick = onNavigateToGuardian)
+
+            Spacer(modifier = Modifier.weight(0.6f))
+
+            // ── 4. Two supporting buttons ──────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                SupportingButton(
+                    modifier = Modifier.weight(1f),
+                    icon = if (uiState.allShieldsOn) Icons.Default.Shield else Icons.Default.Warning,
+                    label = if (uiState.allShieldsOn) "Security is ON" else "Turn On Security",
+                    badgeDot = !uiState.allShieldsOn,
+                    confirmed = showSecurityConfirm,
+                    onClick = {
+                        if (!uiState.allShieldsOn) {
+                            viewModel.enableAllShields()
+                            showSecurityConfirm = true
+                        }
+                    }
+                )
+
+                SupportingButton(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Phone,
+                    label = "Call a Friend",
+                    badgeDot = false,
+                    confirmed = false,
+                    dialNumber = uiState.familyContacts.firstOrNull()?.number,
+                    onClick = {
+                        if (uiState.familyContacts.isEmpty()) {
+                            showNoContactsDialog = true
+                        } else {
+                            viewModel.recordCallFriendTap()
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(0.4f))
+
+            // ── 5. "See all features" link ─────────────────────────────────
+            TextButton(
+                onClick = { showFeaturesSheet = true },
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Text(
+                    text = "See all features →",
+                    color = WarmGold.copy(alpha = 0.85f),
+                    fontSize = 18.sp
+                )
+            }
+        }
+
+        // ── Dialogs & sheets ───────────────────────────────────────────────
+
+        if (showStatusDialog) {
+            StatusInfoDialog(intelState = intelState, onDismiss = { showStatusDialog = false })
+        }
+
+        if (showNoContactsDialog) {
+            AlertDialog(
+                onDismissRequest = { showNoContactsDialog = false },
+                title = { Text("No Contacts Added", fontSize = 20.sp) },
+                text = {
+                    Text(
+                        "Add a trusted family member or friend in Settings so Guardian can call them for you.",
+                        fontSize = 17.sp
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showNoContactsDialog = false; onNavigateToSettings() }) {
+                        Text("Open Settings", fontSize = 17.sp)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showNoContactsDialog = false }) {
+                        Text("Not now", fontSize = 17.sp)
+                    }
+                },
+                containerColor = Color(0xFF1E4A72),
+                titleContentColor = Color.White,
+                textContentColor = Color.White.copy(alpha = 0.9f)
+            )
+        }
+
+        if (showFeaturesSheet) {
+            FeaturesBottomSheet(
+                onDismiss = { showFeaturesSheet = false },
+                onSmsShield = { showFeaturesSheet = false; onNavigateToMessages() },
+                onCallShield = { showFeaturesSheet = false; onNavigateToCalls() },
+                onSettings = { showFeaturesSheet = false; onNavigateToSettings() }
             )
         }
     }
 }
 
+// ── Status badge ──────────────────────────────────────────────────────────────
+
 @Composable
-private fun ThreatListDialog(
-    threats: List<ScamRuleEntity>,
-    onDismiss: () -> Unit
+private fun StatusBadge(intelState: IntelState, onClick: () -> Unit) {
+    val hasSynced = intelState.lastSyncMs > 0L
+    val threatCount = intelState.threats.size
+
+    val label = when {
+        !hasSynced -> "🛡️ Protected — local rules active"
+        threatCount > 0 -> "🛡️ Protected — $threatCount active alerts"
+        else -> {
+            val agoHours = ((System.currentTimeMillis() - intelState.lastSyncMs) / 3_600_000).toInt()
+            val agoText = when {
+                agoHours < 1 -> "just now"
+                agoHours == 1 -> "1 hour ago"
+                else -> "$agoHours hours ago"
+            }
+            "🛡️ Protected — database updated $agoText"
+        }
+    }
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = Color(0xFF0F2540),
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = label,
+            color = Color.White.copy(alpha = 0.9f),
+            fontSize = 15.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+        )
+    }
+}
+
+// ── Push-to-talk button ───────────────────────────────────────────────────────
+
+@Composable
+private fun PushToTalkButton(onClick: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ptt_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.14f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ), label = "scale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f, targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ), label = "alpha"
+    )
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(contentAlignment = Alignment.Center) {
+            // Outer pulse ring
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .scale(pulseScale)
+                    .clip(CircleShape)
+                    .background(WarmGold.copy(alpha = pulseAlpha))
+            )
+            // Main button
+            Surface(
+                onClick = onClick,
+                shape = CircleShape,
+                color = WarmGold,
+                shadowElevation = 12.dp,
+                modifier = Modifier.size(164.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Talk to Guardian Angel",
+                        tint = Color.White,
+                        modifier = Modifier.size(68.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "Tap to talk to Guardian Angel",
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "or shake your phone",
+            color = Color.White.copy(alpha = 0.55f),
+            fontSize = 15.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
+// ── Supporting button ─────────────────────────────────────────────────────────
+
+@Composable
+private fun SupportingButton(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    badgeDot: Boolean,
+    confirmed: Boolean,
+    dialNumber: String? = null,
+    onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+
+    Surface(
+        onClick = {
+            if (dialNumber != null) {
+                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$dialNumber")))
+                onClick()
+            } else {
+                onClick()
+            }
+        },
+        shape = RoundedCornerShape(20.dp),
+        color = NavyBlueLight,
+        border = BorderStroke(
+            width = if (confirmed) 2.dp else 1.5.dp,
+            color = if (confirmed) SafeGreen else WarmGold.copy(alpha = 0.6f)
+        ),
+        modifier = modifier.height(100.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (badgeDot) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(WarningAmber)
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = if (confirmed) Icons.Default.CheckCircle else icon,
+                    contentDescription = null,
+                    tint = if (confirmed) SafeGreen else WarmGold,
+                    modifier = Modifier.size(30.dp)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (confirmed) "Security is ON ✓" else label,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+// ── Status info dialog ────────────────────────────────────────────────────────
+
+@Composable
+private fun StatusInfoDialog(intelState: IntelState, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor   = WarmWhite,
-        title = {
-            Text(
-                "Active Threat Alerts",
-                style = MaterialTheme.typography.headlineSmall,
-                color = NavyBlue
-            )
+        icon = {
+            Icon(Icons.Default.Shield, null, tint = WarmGold, modifier = Modifier.size(36.dp))
         },
+        title = { Text("About Your Protection", fontSize = 21.sp, fontWeight = FontWeight.Bold) },
         text = {
-            if (threats.isEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "No high-priority threats currently loaded.\n\nConfigure your intelligence server URL in Settings to receive real-time FBI/FTC/CISA scam alerts.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
+                    "Guardian Angel checks every text message and phone call for scam patterns before they reach you.",
+                    fontSize = 17.sp
                 )
-            } else {
-                androidx.compose.foundation.lazy.LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(threats) { threat ->
-                        val (badgeColor, emoji) = when (threat.severity) {
-                            "CRITICAL" -> Pair(ScamRed,     "🚨")
-                            "HIGH"     -> Pair(WarningAmber,"⚠️")
-                            else       -> Pair(SafeGreen,   "ℹ️")
-                        }
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = when (threat.severity) {
-                                    "CRITICAL" -> ScamRedLight
-                                    else       -> WarningAmberLight
-                                }
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(emoji, fontSize = 14.sp)
-                                    Text(
-                                        threat.scamType,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = badgeColor
-                                    )
-                                }
-                                Text(
-                                    threat.plainEnglishWarning,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextPrimary
-                                )
-                            }
-                        }
-                    }
+                if (intelState.lastSyncMs > 0L) {
+                    Text(
+                        "Your scam database was last updated ${formatTime(intelState.lastSyncMs)} and contains ${intelState.threats.size} active threat alerts from FBI, FTC, and CISA.",
+                        fontSize = 17.sp
+                    )
+                } else {
+                    Text(
+                        "Your device uses built-in scam rules. Add a server URL in Settings to receive live updates.",
+                        fontSize = 17.sp
+                    )
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
-                modifier = Modifier.height(52.dp)
-            ) {
-                Text("Got it", style = MaterialTheme.typography.labelLarge)
-            }
-        }
+            TextButton(onClick = onDismiss) { Text("Got it", fontSize = 17.sp) }
+        },
+        containerColor = Color(0xFF1E4A72),
+        titleContentColor = Color.White,
+        textContentColor = Color.White.copy(alpha = 0.9f),
+        iconContentColor = WarmGold
     )
 }
 
+// ── Features bottom sheet ─────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CallAFriendRow(
-    contacts: List<FamilyContact>,
-    context: android.content.Context,
-    onTap: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        contacts.take(3).forEach { contact ->
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        onTap()
-                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contact.number}"))
-                        context.startActivity(intent)
-                    },
-                colors = CardDefaults.cardColors(containerColor = NavyBlue),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("📞", fontSize = 24.sp)
-                    Text(
-                        contact.nickname,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-        // Fill empty slots so cards don't stretch weirdly when < 3 contacts
-        repeat((3 - contacts.size).coerceAtLeast(0)) {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-fun AlertCard(alert: AlertEntity, onClick: () -> Unit) {
-    val (badgeColor, badgeText) = when (alert.riskLevel) {
-        "SCAM" -> Pair(ScamRed, "SCAM")
-        "WARNING" -> Pair(WarningAmber, "WARNING")
-        else -> Pair(SafeGreen, "SAFE")
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = when (alert.riskLevel) {
-                "SCAM" -> ScamRedLight
-                "WARNING" -> WarningAmberLight
-                else -> SafeGreenLight
-            }
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        if (alert.type == "SMS") "💬" else "📞",
-                        fontSize = 20.sp
-                    )
-                    Text(
-                        alert.sender,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TextPrimary
-                    )
-                }
-                Surface(
-                    color = badgeColor,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        badgeText,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            Text(
-                alert.reason,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            Text(
-                alert.action,
-                style = MaterialTheme.typography.bodySmall,
-                color = badgeColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            Text(
-                formatTime(alert.timestamp),
-                style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeBottomBar(
-    onCalls: () -> Unit,
-    onMessages: () -> Unit,
+private fun FeaturesBottomSheet(
+    onDismiss: () -> Unit,
+    onSmsShield: () -> Unit,
+    onCallShield: () -> Unit,
     onSettings: () -> Unit
 ) {
-    NavigationBar(
-        containerColor = Color.White,
-        tonalElevation = 4.dp
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color(0xFF0F2540),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.3f))
+            )
+        }
     ) {
-        NavigationBarItem(
-            selected = false,
-            onClick = onCalls,
-            icon = { Icon(Icons.Default.Phone, contentDescription = "Calls") },
-            label = { Text("Calls", style = MaterialTheme.typography.labelMedium) }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = onMessages,
-            icon = { Icon(Icons.Default.Message, contentDescription = "Messages") },
-            label = { Text("Messages", style = MaterialTheme.typography.labelMedium) }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = onSettings,
-            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-            label = { Text("Settings", style = MaterialTheme.typography.labelMedium) }
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                "All Features",
+                color = WarmGold, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            FeatureRow(Icons.Default.Message, "SMS Shield",
+                "Guardian reads your texts and warns you about scams", onSmsShield)
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            FeatureRow(Icons.Default.Phone, "Call Shield",
+                "Guardian screens suspicious calls before they reach you", onCallShield)
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            FeatureRow(Icons.Default.Notifications, "Scam Alerts",
+                "View all recent warnings and blocked threats", onSmsShield)
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            FeatureRow(Icons.Default.Settings, "Settings",
+                "Family contacts, privacy, wake word, and more", onSettings)
+        }
     }
 }
 
+@Composable
+private fun FeatureRow(
+    icon: ImageVector, title: String, description: String, onClick: () -> Unit
+) {
+    Surface(onClick = onClick, color = Color.Transparent) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(icon, null, tint = WarmGold, modifier = Modifier.size(28.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(description, color = Color.White.copy(alpha = 0.65f), fontSize = 15.sp)
+            }
+            Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(alpha = 0.4f))
+        }
+    }
+}
