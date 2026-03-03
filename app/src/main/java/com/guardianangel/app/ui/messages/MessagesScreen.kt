@@ -1,8 +1,10 @@
 package com.guardianangel.app.ui.messages
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -11,11 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.guardianangel.app.ui.home.AlertCard
+import com.guardianangel.app.data.local.entity.AlertEntity
 import com.guardianangel.app.util.formatTime
 import com.guardianangel.app.ui.theme.*
 
@@ -94,6 +97,53 @@ private fun MessagesTopBar(onBack: () -> Unit) {
             Text("💬 Text Messages", style = MaterialTheme.typography.titleLarge, color = Color.White)
         }
     )
+}
+
+@Composable
+fun AlertCard(alert: AlertEntity, onClick: () -> Unit) {
+    val (badgeColor, badgeText) = when (alert.riskLevel) {
+        "SCAM"    -> Pair(ScamRed, "SCAM")
+        "WARNING" -> Pair(WarningAmber, "WARNING")
+        else      -> Pair(SafeGreen, "SAFE")
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = when (alert.riskLevel) {
+                "SCAM"    -> ScamRedLight
+                "WARNING" -> WarningAmberLight
+                else      -> SafeGreenLight
+            }
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (alert.type == "SMS") "💬" else "📞", fontSize = 20.sp)
+                    Text(alert.sender, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                }
+                Surface(color = badgeColor, shape = RoundedCornerShape(8.dp)) {
+                    Text(badgeText,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium, color = Color.White)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(alert.reason, style = MaterialTheme.typography.bodyMedium, color = TextSecondary,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Text(alert.action, style = MaterialTheme.typography.bodySmall, color = badgeColor,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Text(formatTime(alert.timestamp), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+        }
+    }
 }
 
 @Composable
