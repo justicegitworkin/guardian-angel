@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.guardianangel.app.data.local.AppDatabase
 import com.guardianangel.app.data.local.MIGRATION_1_2
+import com.guardianangel.app.data.local.MIGRATION_2_3
 import com.guardianangel.app.data.local.dao.*
 import dagger.Module
 import dagger.Provides
@@ -24,7 +25,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
         )
-        .addMigrations(MIGRATION_1_2)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
         .build()
     }
 
@@ -39,4 +40,7 @@ object DatabaseModule {
 
     @Provides
     fun provideBlockedNumberDao(db: AppDatabase): BlockedNumberDao = db.blockedNumberDao()
+
+    @Provides
+    fun provideScamRuleDao(db: AppDatabase): ScamRuleDao = db.scamRuleDao()
 }

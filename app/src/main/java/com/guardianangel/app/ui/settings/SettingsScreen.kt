@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -42,6 +43,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val testResult by viewModel.testResult.collectAsStateWithLifecycle()
     val clearDataResult by viewModel.clearDataResult.collectAsStateWithLifecycle()
+    val intelSettings by viewModel.intelSettings.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     var userName by remember(state.userName) { mutableStateOf(state.userName) }
@@ -54,6 +56,8 @@ fun SettingsScreen(
     var porcupineKey by remember(state.porcupineKey) { mutableStateOf(state.porcupineKey) }
     var showPorcupineKey by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
+    var intelServerUrl by remember(intelSettings.serverUrl) { mutableStateOf(intelSettings.serverUrl) }
+    var showThreatList by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -565,6 +569,154 @@ fun SettingsScreen(
                         kotlinx.coroutines.delay(3000)
                         viewModel.dismissClearDataResult()
                     }
+                }
+            }
+
+            // ── Threat list dialog ────────────────────────────────────────
+            if (showThreatList) {
+                AlertDialog(
+                    onDismissRequest = { showThreatList = false },
+                    containerColor   = WarmWhite,
+                    title = {
+                        Text("Current Threat Alerts", style = MaterialTheme.typography.headlineSmall, color = NavyBlue)
+                    },
+                    text = {
+                        if (intelSettings.allRules.isEmpty()) {
+                            Text(
+                                "No rules loaded yet. Configure the server URL below and wait for the next sync.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
+                        } else {
+                            androidx.compose.foundation.lazy.LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(intelSettings.allRules) { rule ->
+                                    val badgeColor = when (rule.severity) {
+                                        "CRITICAL" -> ScamRed
+                                        "HIGH"     -> WarningAmber
+                                        "MEDIUM"   -> NavyBlue
+                                        else       -> SafeGreen
+                                    }
+                                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Surface(
+                                                color = badgeColor,
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    rule.severity,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.White
+                                                )
+                                            }
+                                            Text(rule.scamType, style = MaterialTheme.typography.labelMedium, color = TextPrimary)
+                                        }
+                                        Text(rule.plainEnglishWarning, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = { showThreatList = false }, colors = ButtonDefaults.buttonColors(containerColor = NavyBlue)) {
+                            Text("Close")
+                        }
+                    }
+                )
+            }
+
+            // ── Scam Intelligence ─────────────────────────────────────────
+            SettingsSection(title = "Scam Intelligence") {
+                Text(
+                    "Guardian automatically downloads real-time scam patterns from FBI, FTC, IC3, and CISA every hour and uses them to improve detection.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(12.dp))
+
+                // Server URL field
+                OutlinedTextField(
+                    value = intelServerUrl,
+                    onValueChange = { intelServerUrl = it },
+                    label = { Text("Intelligence Server URL") },
+                    placeholder = { Text("https://my-server.railway.app") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedContainerColor = InputBackground,
+                        unfocusedContainerColor = InputBackground,
+                        focusedBorderColor = NavyBlue,
+                        unfocusedBorderColor = Color(0xFFBBBBBB),
+                        focusedLabelColor = NavyBlue,
+                        unfocusedLabelColor = TextSecondary,
+                        cursorColor = NavyBlue
+                    ),
+                    trailingIcon = {
+                        IconButton(onClick = { viewModel.setScamIntelServerUrl(intelServerUrl.trim()) }) {
+                            Icon(Icons.Default.Save, contentDescription = "Save URL", tint = WarmGold)
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+
+                // Last sync time
+                val syncLabel = when {
+                    intelSettings.lastSyncMs == 0L -> "Not yet synced"
+                    else -> {
+                        val minAgo = ((System.currentTimeMillis() - intelSettings.lastSyncMs) / 60_000).toInt()
+                        when {
+                            minAgo < 1   -> "Last sync: just now"
+                            minAgo < 60  -> "Last sync: $minAgo minutes ago"
+                            minAgo < 120 -> "Last sync: 1 hour ago"
+                            else         -> "Last sync: ${minAgo / 60} hours ago"
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(syncLabel, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text(
+                        "${intelSettings.allRules.size} rules loaded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (intelSettings.allRules.isEmpty()) TextSecondary else SafeGreen
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                // Notifications toggle
+                ShieldToggleRow(
+                    label = "Notify on HIGH/CRITICAL threats",
+                    isOn  = intelSettings.notifications,
+                    onToggle = { viewModel.setScamIntelNotifications(it) }
+                )
+                Text(
+                    "A quiet notification appears when new high-priority scam patterns are downloaded.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                // View all threats button
+                OutlinedButton(
+                    onClick = { showThreatList = true },
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Icon(Icons.Default.Security, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("View Current Threat List", style = MaterialTheme.typography.labelLarge)
                 }
             }
 

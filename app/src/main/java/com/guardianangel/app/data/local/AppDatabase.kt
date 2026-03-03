@@ -8,6 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.guardianangel.app.data.local.dao.*
 import com.guardianangel.app.data.local.entity.*
+import java.util.concurrent.TimeUnit
 
 /**
  * v1 → v2: removed raw message content (alerts.content) and call
@@ -62,14 +63,33 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/** v2 → v3: add scam_rules table for real-time intelligence sync. */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS scam_rules (
+                id                    INTEGER PRIMARY KEY NOT NULL DEFAULT 0,
+                scamType              TEXT    NOT NULL,
+                keyPhrases            TEXT    NOT NULL DEFAULT '[]',
+                urgencyIndicators     TEXT    NOT NULL DEFAULT '[]',
+                impersonationTargets  TEXT    NOT NULL DEFAULT '[]',
+                plainEnglishWarning   TEXT    NOT NULL,
+                severity              TEXT    NOT NULL DEFAULT 'MEDIUM',
+                createdAt             INTEGER NOT NULL DEFAULT 0
+            )
+        """.trimIndent())
+    }
+}
+
 @Database(
     entities = [
         AlertEntity::class,
         MessageEntity::class,
         CallLogEntity::class,
-        BlockedNumberEntity::class
+        BlockedNumberEntity::class,
+        ScamRuleEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -78,6 +98,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
     abstract fun callLogDao(): CallLogDao
     abstract fun blockedNumberDao(): BlockedNumberDao
+    abstract fun scamRuleDao(): ScamRuleDao
 
     companion object {
         const val DATABASE_NAME = "guardian_angel_db"

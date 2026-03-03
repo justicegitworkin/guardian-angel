@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.guardianangel.app.data.local.entity.AlertEntity
+import com.guardianangel.app.data.local.entity.ScamRuleEntity
 import com.guardianangel.app.data.remote.model.FamilyContact
 import com.guardianangel.app.ui.theme.*
 import com.guardianangel.app.util.formatTime
@@ -44,8 +45,10 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val intelState by viewModel.intelState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var isCallScreeningActive by remember { mutableStateOf(true) } // assume active until checked
+    var showThreatDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -61,6 +64,13 @@ fun HomeScreen(
             val rm = context.getSystemService(RoleManager::class.java)
             isCallScreeningActive = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
         }
+    }
+
+    if (showThreatDialog) {
+        ThreatListDialog(
+            threats = intelState.threats,
+            onDismiss = { showThreatDialog = false }
+        )
     }
 
     Scaffold(
@@ -171,6 +181,15 @@ fun HomeScreen(
                         onToggle = { viewModel.setEmailShield(it) }
                     )
                 }
+            }
+
+            // Intelligence badge — always shown (shows "no data" state when server not configured)
+            item {
+                IntelligenceBadge(
+                    lastSyncMs    = intelState.lastSyncMs,
+                    threatCount   = intelState.threats.size,
+                    onClick       = { showThreatDialog = true }
+                )
             }
 
             // Call a Friend
@@ -374,6 +393,144 @@ private fun AllClearCard() {
             )
         }
     }
+}
+
+@Composable
+private fun IntelligenceBadge(
+    lastSyncMs: Long,
+    threatCount: Int,
+    onClick: () -> Unit
+) {
+    val syncLabel = when {
+        lastSyncMs == 0L  -> "Not yet synced — add server URL in Settings"
+        else -> {
+            val minAgo = ((System.currentTimeMillis() - lastSyncMs) / 60_000).toInt()
+            when {
+                minAgo < 1   -> "Updated just now"
+                minAgo < 60  -> "Updated $minAgo min ago"
+                minAgo < 120 -> "Updated 1 hour ago"
+                else         -> "Updated ${minAgo / 60} hours ago"
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = NavyBlue.copy(alpha = 0.08f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "🛡️ Scam Intelligence",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = NavyBlue
+                )
+                Text(
+                    syncLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                if (threatCount > 0) {
+                    Text(
+                        "📋 $threatCount active threat alert${if (threatCount > 1) "s" else ""} loaded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WarningAmber
+                    )
+                }
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = "View threats",
+                tint = NavyBlue,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThreatListDialog(
+    threats: List<ScamRuleEntity>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = WarmWhite,
+        title = {
+            Text(
+                "Active Threat Alerts",
+                style = MaterialTheme.typography.headlineSmall,
+                color = NavyBlue
+            )
+        },
+        text = {
+            if (threats.isEmpty()) {
+                Text(
+                    "No high-priority threats currently loaded.\n\nConfigure your intelligence server URL in Settings to receive real-time FBI/FTC/CISA scam alerts.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+            } else {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(threats) { threat ->
+                        val (badgeColor, emoji) = when (threat.severity) {
+                            "CRITICAL" -> Pair(ScamRed,     "🚨")
+                            "HIGH"     -> Pair(WarningAmber,"⚠️")
+                            else       -> Pair(SafeGreen,   "ℹ️")
+                        }
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = when (threat.severity) {
+                                    "CRITICAL" -> ScamRedLight
+                                    else       -> WarningAmberLight
+                                }
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(emoji, fontSize = 14.sp)
+                                    Text(
+                                        threat.scamType,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = badgeColor
+                                    )
+                                }
+                                Text(
+                                    threat.plainEnglishWarning,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
+                modifier = Modifier.height(52.dp)
+            ) {
+                Text("Got it", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    )
 }
 
 @Composable

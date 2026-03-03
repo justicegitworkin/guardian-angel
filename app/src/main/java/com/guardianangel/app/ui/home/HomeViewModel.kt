@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.guardianangel.app.data.datastore.UserPreferences
+import com.guardianangel.app.data.local.dao.ScamRuleDao
 import com.guardianangel.app.data.local.entity.AlertEntity
+import com.guardianangel.app.data.local.entity.ScamRuleEntity
 import com.guardianangel.app.data.remote.model.FamilyContact
 import com.guardianangel.app.data.repository.AlertRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,10 +27,16 @@ data class HomeUiState(
     val allShieldsOn: Boolean get() = isSmsShieldOn && isCallShieldOn && isEmailShieldOn
 }
 
+data class IntelState(
+    val lastSyncMs: Long = 0L,
+    val threats: List<ScamRuleEntity> = emptyList()
+)
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val prefs: UserPreferences,
     private val alertRepository: AlertRepository,
+    private val scamRuleDao: ScamRuleDao,
     private val gson: Gson
 ) : ViewModel() {
 
@@ -85,4 +93,11 @@ class HomeViewModel @Inject constructor(
     fun setEmailShield(enabled: Boolean) { viewModelScope.launch { prefs.setEmailShield(enabled) } }
     fun markAlertRead(alertId: Long) { viewModelScope.launch { alertRepository.markAsRead(alertId) } }
     fun recordCallFriendTap() { viewModelScope.launch { prefs.recordCallFriendTap() } }
+
+    /** Live intelligence state — last sync time + HIGH/CRITICAL threat list. */
+    val intelState: StateFlow<IntelState> = combine(
+        prefs.scamIntelLastSync,
+        scamRuleDao.observeHighCriticalRules()
+    ) { lastSync, threats -> IntelState(lastSync, threats) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntelState())
 }

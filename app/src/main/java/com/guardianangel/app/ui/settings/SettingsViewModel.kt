@@ -10,6 +10,8 @@ import com.guardianangel.app.data.datastore.UserPreferences
 import com.guardianangel.app.data.local.dao.AlertDao
 import com.guardianangel.app.data.local.dao.CallLogDao
 import com.guardianangel.app.data.local.dao.MessageDao
+import com.guardianangel.app.data.local.dao.ScamRuleDao
+import com.guardianangel.app.data.local.entity.ScamRuleEntity
 import com.guardianangel.app.data.remote.ClaudeApiService
 import com.guardianangel.app.data.remote.model.ClaudeMessage
 import com.guardianangel.app.data.remote.model.ClaudeRequest
@@ -76,6 +78,13 @@ private data class AnalyticsPrefs(
     val callFriendTaps: Int
 )
 
+data class IntelSettingsState(
+    val serverUrl: String = "",
+    val lastSyncMs: Long = 0L,
+    val notifications: Boolean = true,
+    val allRules: List<ScamRuleEntity> = emptyList()
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -84,7 +93,8 @@ class SettingsViewModel @Inject constructor(
     private val gson: Gson,
     private val alertDao: AlertDao,
     private val messageDao: MessageDao,
-    private val callLogDao: CallLogDao
+    private val callLogDao: CallLogDao,
+    private val scamRuleDao: ScamRuleDao
 ) : ViewModel() {
 
     private val familyType = object : TypeToken<List<FamilyContact>>() {}.type
@@ -248,4 +258,22 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun dismissClearDataResult() { _clearDataResult.value = null }
+
+    // ── Scam Intelligence ─────────────────────────────────────────────
+    val intelSettings: StateFlow<IntelSettingsState> = combine(
+        combine(prefs.scamIntelServerUrl, prefs.scamIntelLastSync, prefs.scamIntelNotifications) {
+            url, sync, notify -> Triple(url, sync, notify)
+        },
+        scamRuleDao.observeAllRules()
+    ) { (url, sync, notify), rules ->
+        IntelSettingsState(
+            serverUrl     = url,
+            lastSyncMs    = sync,
+            notifications = notify,
+            allRules      = rules
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IntelSettingsState())
+
+    fun setScamIntelServerUrl(url: String) = viewModelScope.launch { prefs.setScamIntelServerUrl(url) }
+    fun setScamIntelNotifications(on: Boolean) = viewModelScope.launch { prefs.setScamIntelNotifications(on) }
 }

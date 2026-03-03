@@ -7,9 +7,12 @@ import com.guardianangel.app.data.ai.OnDeviceAIService
 import com.guardianangel.app.data.datastore.UserPreferences
 import com.guardianangel.app.data.local.dao.AlertDao
 import com.guardianangel.app.data.local.dao.BlockedNumberDao
+import com.guardianangel.app.data.local.dao.ScamRuleDao
 import com.guardianangel.app.data.local.entity.AlertEntity
 import com.guardianangel.app.data.local.entity.BlockedNumberEntity
 import com.guardianangel.app.data.remote.ClaudeApiService
+import com.guardianangel.app.data.remote.ScamIntelligenceApiService
+import com.guardianangel.app.data.remote.ScamReportDto
 import com.guardianangel.app.data.remote.model.ClaudeMessage
 import com.guardianangel.app.data.remote.model.ClaudeRequest
 import com.guardianangel.app.data.remote.model.SmsAnalysisResult
@@ -43,7 +46,9 @@ Scam indicators: urgency/threats, requests for personal info or money, suspiciou
 class AlertRepository @Inject constructor(
     private val alertDao: AlertDao,
     private val blockedNumberDao: BlockedNumberDao,
+    private val scamRuleDao: ScamRuleDao,
     private val claudeApi: ClaudeApiService,
+    private val scamIntelApi: ScamIntelligenceApiService,
     private val onDeviceAI: OnDeviceAIService,
     private val userPreferences: UserPreferences,
     private val gson: Gson
@@ -131,17 +136,32 @@ class AlertRepository @Inject constructor(
 
         // Fall back to Claude cloud API
         return runCatching {
-            val prompt = SMS_ANALYSIS_TEMPLATE.format(sender, body)
+            // Inject latest HIGH/CRITICAL intelligence rules into the system prompt
+            val sevenDaysAgo  = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7)
+            val activeRules   = scamRuleDao.getRecentHighCritical(sevenDaysAgo, limit = 10)
+            val systemPrompt  = if (activeRules.isEmpty()) {
+                SMS_SYSTEM_PROMPT
+            } else {
+                buildString {
+                    append(SMS_SYSTEM_PROMPT)
+                    append("\n\nCurrent active scam alerts from FBI/FTC/CISA (apply these to improve detection):\n")
+                    activeRules.forEach { rule ->
+                        append("• [${rule.severity}] ${rule.scamType}: ${rule.plainEnglishWarning}\n")
+                    }
+                }
+            }
+
+            val prompt  = SMS_ANALYSIS_TEMPLATE.format(sender, body)
             val request = ClaudeRequest(
-                messages = listOf(ClaudeMessage(role = "user", content = prompt)),
-                system = SMS_SYSTEM_PROMPT,
+                messages  = listOf(ClaudeMessage(role = "user", content = prompt)),
+                system    = systemPrompt,
                 maxTokens = 256
             )
             val response = claudeApi.sendMessage(apiKey = apiKey, request = request)
             if (!response.isSuccessful) throw Exception("API error: ${response.code()}")
 
             val rawText = response.body()?.text ?: throw Exception("Empty response")
-            val result = gson.fromJson(extractJson(rawText), SmsAnalysisResult::class.java)
+            val result  = gson.fromJson(extractJson(rawText), SmsAnalysisResult::class.java)
 
             // Increment cloud message counter (date-keyed, resets daily)
             val today = LocalDate.now().toString()
@@ -149,15 +169,30 @@ class AlertRepository @Inject constructor(
 
             // Store analysis result ONLY — never the original SMS body
             val entity = AlertEntity(
-                type = "SMS",
-                sender = sender,
+                type      = "SMS",
+                sender    = sender,
                 riskLevel = result.riskLevel.uppercase(),
-                confidence = result.confidence,
-                reason = result.reason,
-                action = result.action
+                confidence= result.confidence,
+                reason    = result.reason,
+                action    = result.action
             )
             val id = alertDao.insertAlert(entity)
-            if (entity.riskLevel != "SAFE") userPreferences.recordSmsAlert()
+            if (entity.riskLevel != "SAFE") {
+                userPreferences.recordSmsAlert()
+                // Anonymous telemetry to the server (fire-and-forget)
+                val serverUrl = userPreferences.scamIntelServerUrl.first().trim()
+                if (serverUrl.isNotBlank()) {
+                    runCatching {
+                        scamIntelApi.reportScam(
+                            "${serverUrl.trimEnd('/')}/scam-report",
+                            ScamReportDto(
+                                type     = if (entity.riskLevel == "SCAM") "SMS_SCAM" else "SMS_WARNING",
+                                severity = entity.riskLevel
+                            )
+                        )
+                    }
+                }
+            }
             entity.copy(id = id)
         }
     }

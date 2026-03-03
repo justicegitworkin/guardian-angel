@@ -1,0 +1,21 @@
+{
+  "name": "guardian-angel-scam-intelligence",
+  "version": "1.0.0",
+  "description": "Real-time scam intelligence backend for Guardian Angel senior protection app",
+  "main": "ScamIntelligenceServer.js",
+  "scripts": {
+    "start": "node ScamIntelligenceServer.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.20.0",
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
+    "xml2js": "^0.6.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

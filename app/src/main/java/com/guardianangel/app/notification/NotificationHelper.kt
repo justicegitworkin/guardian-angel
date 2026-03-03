@@ -106,5 +106,16 @@ class NotificationHelper @Inject constructor(
         manager.notify(8888, notification)
     }
 
+    fun showScamIntelUpdate(newHighCriticalCount: Int) {
+        val notification = NotificationCompat.Builder(context, GuardianAngelApp.CHANNEL_INTEL)
+            .setSmallIcon(R.drawable.ic_guardian_angel)
+            .setContentTitle("🛡️ Scam intelligence updated")
+            .setContentText("$newHighCriticalCount new HIGH/CRITICAL threat alert${if (newHighCriticalCount > 1) "s" else ""} downloaded")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .build()
+        manager.notify(7777, notification)
+    }
+
     fun cancelNotification(id: Int) = manager.cancel(id)
 }

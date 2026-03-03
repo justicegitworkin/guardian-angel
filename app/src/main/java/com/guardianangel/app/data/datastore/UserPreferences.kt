@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.guardianangel.app.security.SecureStorageManager
@@ -44,6 +45,10 @@ class UserPreferences @Inject constructor(
         val KEY_SAVE_CONVERSATION = booleanPreferencesKey("save_conversation_history")
         val KEY_CLOUD_MSG_COUNT = intPreferencesKey("cloud_messages_today")
         val KEY_CLOUD_MSG_DATE = stringPreferencesKey("cloud_messages_date") // "yyyy-MM-dd"
+        // Scam intelligence sync
+        val KEY_SCAM_INTEL_SERVER_URL    = stringPreferencesKey("scam_intel_server_url")
+        val KEY_SCAM_INTEL_LAST_SYNC     = longPreferencesKey("scam_intel_last_sync")
+        val KEY_SCAM_INTEL_NOTIFICATIONS = booleanPreferencesKey("scam_intel_notifications")
         // Analytics (local only, counts only, no personal data)
         val KEY_ANALYTICS_CHAT_SESSIONS = intPreferencesKey("analytics_chat_sessions")
         val KEY_ANALYTICS_SMS_ALERTS = intPreferencesKey("analytics_sms_alerts")
@@ -75,6 +80,10 @@ class UserPreferences @Inject constructor(
     val saveConversationHistory: Flow<Boolean> = safeData.map { it[KEY_SAVE_CONVERSATION] ?: false }
     val cloudMessagesToday: Flow<Int> = safeData.map { it[KEY_CLOUD_MSG_COUNT] ?: 0 }
     val cloudMessagesDate: Flow<String> = safeData.map { it[KEY_CLOUD_MSG_DATE] ?: "" }
+    // Scam intelligence
+    val scamIntelServerUrl: Flow<String>    = safeData.map { it[KEY_SCAM_INTEL_SERVER_URL]    ?: "" }
+    val scamIntelLastSync: Flow<Long>       = safeData.map { it[KEY_SCAM_INTEL_LAST_SYNC]     ?: 0L }
+    val scamIntelNotifications: Flow<Boolean> = safeData.map { it[KEY_SCAM_INTEL_NOTIFICATIONS] ?: true }
     // Analytics
     val chatSessionCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_CHAT_SESSIONS] ?: 0 }
     val smsAlertCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_SMS_ALERTS] ?: 0 }
@@ -110,6 +119,17 @@ class UserPreferences @Inject constructor(
             it[KEY_CLOUD_MSG_COUNT] = 0
             it[KEY_CLOUD_MSG_DATE] = ""
         }
+    }
+
+    // Scam intelligence setters
+    suspend fun setScamIntelServerUrl(url: String) {
+        dataStore.edit { it[KEY_SCAM_INTEL_SERVER_URL] = url }
+    }
+    suspend fun setScamIntelLastSync(ts: Long) {
+        dataStore.edit { it[KEY_SCAM_INTEL_LAST_SYNC] = ts }
+    }
+    suspend fun setScamIntelNotifications(enabled: Boolean) {
+        dataStore.edit { it[KEY_SCAM_INTEL_NOTIFICATIONS] = enabled }
     }
 
     // Analytics increment helpers
