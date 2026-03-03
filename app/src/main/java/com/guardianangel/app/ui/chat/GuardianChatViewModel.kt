@@ -54,6 +54,10 @@ class GuardianChatViewModel @Inject constructor(
     // In-memory context for API calls (parallel to inMemoryMessages, role/content only)
     private val inMemoryContext = mutableListOf<ClaudeMessage>()
 
+    // Counter for unique IDs on in-memory messages (Room autoGenerate starts at 1,
+    // so negative values avoid any collision with persisted message IDs)
+    private var nextInMemoryId = -1L
+
     private var tts: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
 
@@ -149,13 +153,19 @@ class GuardianChatViewModel @Inject constructor(
 
             } else {
                 // ── In-memory mode (privacy-first) ──────────────────────
-                val userMsg = MessageEntity(content = trimmed, isFromUser = true, sessionId = SESSION_ID)
+                // Use nextInMemoryId-- so every message gets a unique key even though Room
+                // hasn't assigned IDs (all unset MessageEntity ids default to 0, which would
+                // cause duplicate-key crashes in the LazyColumn).
+                val userMsg = MessageEntity(id = nextInMemoryId--, content = trimmed, isFromUser = true, sessionId = SESSION_ID)
                 inMemoryMessages.add(userMsg)
-                inMemoryContext.add(ClaudeMessage(role = "user", content = trimmed))
+                // NOTE: do NOT add to inMemoryContext here — sendInMemory appends it when
+                // building the API payload, and we only add to the context on success so
+                // failed attempts remain retryable without polluting the history.
                 _uiState.update { it.copy(messages = inMemoryMessages.toList()) }
 
                 if (key.isBlank()) {
                     val sysMsg = MessageEntity(
+                        id = nextInMemoryId--,
                         content = "Please add your API key in Settings to chat with Guardian Angel.",
                         isFromUser = false, sessionId = SESSION_ID
                     )
@@ -166,14 +176,16 @@ class GuardianChatViewModel @Inject constructor(
 
                 chatRepository.sendInMemory(apiKey = key, userMessage = trimmed, memoryContext = inMemoryContext)
                     .onSuccess { reply ->
-                        val replyMsg = MessageEntity(content = reply, isFromUser = false, sessionId = SESSION_ID)
+                        val replyMsg = MessageEntity(id = nextInMemoryId--, content = reply, isFromUser = false, sessionId = SESSION_ID)
                         inMemoryMessages.add(replyMsg)
+                        // Commit both turns to context only after a successful round-trip
+                        inMemoryContext.add(ClaudeMessage(role = "user", content = trimmed))
                         inMemoryContext.add(ClaudeMessage(role = "assistant", content = reply))
                         _uiState.update { it.copy(messages = inMemoryMessages.toList(), isLoading = false) }
                         if (speakResponse) speakText(reply)
                     }
                     .onFailure { err ->
-                        val errMsg = MessageEntity(content = friendlyError(err), isFromUser = false, sessionId = SESSION_ID)
+                        val errMsg = MessageEntity(id = nextInMemoryId--, content = friendlyError(err), isFromUser = false, sessionId = SESSION_ID)
                         inMemoryMessages.add(errMsg)
                         _uiState.update { it.copy(messages = inMemoryMessages.toList(), isLoading = false) }
                     }
