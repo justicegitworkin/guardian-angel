@@ -88,6 +88,16 @@ class HomeViewModel @Inject constructor(
     // main combine (which re-emits on every pref change and would re-query the DB unnecessarily).
     val scamsThisMonth: StateFlow<Int> = _scamsThisMonth.asStateFlow()
 
+    val shakeIntroShown: StateFlow<Boolean> = prefs.shakeIntroShown
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true) // default true avoids flash
+
+    fun dismissShakeIntro(turnOff: Boolean = false) {
+        viewModelScope.launch {
+            prefs.setShakeIntroShown(true)
+            if (turnOff) prefs.setShakeEnabled(false)
+        }
+    }
+
     fun setSmsShield(enabled: Boolean) { viewModelScope.launch { prefs.setSmsShield(enabled) } }
     fun setCallShield(enabled: Boolean) { viewModelScope.launch { prefs.setCallShield(enabled) } }
     fun setEmailShield(enabled: Boolean) { viewModelScope.launch { prefs.setEmailShield(enabled) } }

@@ -25,10 +25,11 @@
     <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Foreground Service (call overlay) -->
+    <!-- Foreground Service (call overlay, shake detector) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- System Alert Window (call overlay UI) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -107,6 +108,12 @@
             android:name=".service.WakeWordService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- Shake-to-Activate Foreground Service -->
+        <service
+            android:name=".service.ShakeDetectorService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Notification action receiver (block sender from notification) -->
         <receiver

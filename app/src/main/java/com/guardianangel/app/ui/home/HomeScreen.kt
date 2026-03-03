@@ -81,6 +81,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val intelState by viewModel.intelState.collectAsStateWithLifecycle()
+    val shakeIntroShown by viewModel.shakeIntroShown.collectAsStateWithLifecycle()
 
     var showStatusDialog by remember { mutableStateOf(false) }
     var showFeaturesSheet by remember { mutableStateOf(false) }
@@ -234,6 +235,41 @@ fun HomeScreen(
                 onSmsShield = { showFeaturesSheet = false; onNavigateToMessages() },
                 onCallShield = { showFeaturesSheet = false; onNavigateToCalls() },
                 onSettings = { showFeaturesSheet = false; onNavigateToSettings() }
+            )
+        }
+
+        // One-time shake intro dialog
+        if (!shakeIntroShown) {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissShakeIntro() },
+                icon = {
+                    Text("📳", fontSize = 36.sp)
+                },
+                title = {
+                    Text("New! Shake to Activate", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                },
+                text = {
+                    Text(
+                        "Shake your phone anytime to instantly reach Guardian Angel, even when the app is closed. You can turn this off in Settings.",
+                        fontSize = 17.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel.dismissShakeIntro(turnOff = false) },
+                        colors = ButtonDefaults.buttonColors(containerColor = WarmGold)
+                    ) {
+                        Text("Got it", fontSize = 17.sp, color = Color(0xFF1A1A1A))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissShakeIntro(turnOff = true) }) {
+                        Text("Turn off", fontSize = 17.sp)
+                    }
+                },
+                containerColor = Color(0xFF1E4A72),
+                titleContentColor = Color.White,
+                textContentColor = Color.White.copy(alpha = 0.9f)
             )
         }
     }

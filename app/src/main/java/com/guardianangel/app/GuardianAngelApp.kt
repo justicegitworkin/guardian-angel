@@ -3,11 +3,16 @@ package com.guardianangel.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
 import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.*
+import com.guardianangel.app.data.datastore.UserPreferences
+import com.guardianangel.app.service.ShakeDetectorService
 import com.guardianangel.app.sync.ScamIntelligenceSync
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -15,11 +20,15 @@ import javax.inject.Inject
 class GuardianAngelApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var prefs: UserPreferences
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         const val CHANNEL_ALERTS = "guardian_alerts"
         const val CHANNEL_CALL   = "guardian_call"
         const val CHANNEL_INTEL  = "guardian_intel"
+        const val CHANNEL_SHAKE  = "guardian_shake"
     }
 
     // WorkManager uses this factory so @HiltWorker workers are injected correctly.
@@ -32,6 +41,16 @@ class GuardianAngelApp : Application(), Configuration.Provider {
         super.onCreate()
         createNotificationChannels()
         scheduleScamIntelSync()
+        startShakeServiceIfEnabled()
+    }
+
+    private fun startShakeServiceIfEnabled() {
+        appScope.launch {
+            if (prefs.isShakeEnabled.first()) {
+                val intent = Intent(this@GuardianAngelApp, ShakeDetectorService::class.java)
+                startForegroundService(intent)
+            }
+        }
     }
 
     private fun scheduleScamIntelSync() {
@@ -80,7 +99,17 @@ class GuardianAngelApp : Application(), Configuration.Provider {
                 setSound(null, null)   // silent — informational only
             }
 
-            manager.createNotificationChannels(listOf(alertsChannel, callChannel, intelChannel))
+            val shakeChannel = NotificationChannel(
+                CHANNEL_SHAKE,
+                "Shake to Activate",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "Persistent background service for shake-to-activate"
+                setSound(null, null)
+                setShowBadge(false)
+            }
+
+            manager.createNotificationChannels(listOf(alertsChannel, callChannel, intelChannel, shakeChannel))
         }
     }
 }

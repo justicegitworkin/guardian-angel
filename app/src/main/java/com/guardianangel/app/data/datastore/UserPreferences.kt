@@ -54,6 +54,9 @@ class UserPreferences @Inject constructor(
         val KEY_ANALYTICS_SMS_ALERTS = intPreferencesKey("analytics_sms_alerts")
         val KEY_ANALYTICS_CALLS_SCREENED = intPreferencesKey("analytics_calls_screened")
         val KEY_ANALYTICS_CALL_FRIEND_TAPS = intPreferencesKey("analytics_call_friend_taps")
+        // Shake to activate
+        val KEY_SHAKE_ENABLED = booleanPreferencesKey("shake_to_activate_enabled")
+        val KEY_SHAKE_INTRO_SHOWN = booleanPreferencesKey("shake_intro_shown")
     }
 
     // Single error-handled upstream shared by all derived flows
@@ -89,6 +92,9 @@ class UserPreferences @Inject constructor(
     val smsAlertCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_SMS_ALERTS] ?: 0 }
     val callsScreenedCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_CALLS_SCREENED] ?: 0 }
     val callFriendTapCount: Flow<Int> = safeData.map { it[KEY_ANALYTICS_CALL_FRIEND_TAPS] ?: 0 }
+    // Shake to activate
+    val isShakeEnabled: Flow<Boolean> = safeData.map { it[KEY_SHAKE_ENABLED] ?: true }
+    val shakeIntroShown: Flow<Boolean> = safeData.map { it[KEY_SHAKE_INTRO_SHOWN] ?: false }
 
     suspend fun setUserName(name: String) { dataStore.edit { it[KEY_USER_NAME] = name } }
     suspend fun setApiKey(key: String) {
@@ -145,4 +151,8 @@ class UserPreferences @Inject constructor(
     suspend fun recordCallFriendTap() {
         dataStore.edit { it[KEY_ANALYTICS_CALL_FRIEND_TAPS] = (it[KEY_ANALYTICS_CALL_FRIEND_TAPS] ?: 0) + 1 }
     }
+
+    // Shake to activate
+    suspend fun setShakeEnabled(enabled: Boolean) { dataStore.edit { it[KEY_SHAKE_ENABLED] = enabled } }
+    suspend fun setShakeIntroShown(shown: Boolean) { dataStore.edit { it[KEY_SHAKE_INTRO_SHOWN] = shown } }
 }

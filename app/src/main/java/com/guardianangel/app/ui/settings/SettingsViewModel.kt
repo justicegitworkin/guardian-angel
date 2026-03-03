@@ -16,6 +16,7 @@ import com.guardianangel.app.data.remote.ClaudeApiService
 import com.guardianangel.app.data.remote.model.ClaudeMessage
 import com.guardianangel.app.data.remote.model.ClaudeRequest
 import com.guardianangel.app.data.remote.model.FamilyContact
+import com.guardianangel.app.service.ShakeDetectorService
 import com.guardianangel.app.service.WakeWordService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -34,6 +35,7 @@ data class SettingsUiState(
     val trustedNumbers: List<String> = emptyList(),
     val isWakeWordEnabled: Boolean = false,
     val porcupineKey: String = "",
+    val isShakeEnabled: Boolean = true,
     // Privacy
     val privacyMode: String = "AUTO",       // "AUTO" | "ON" | "OFF"
     val saveHistory: Boolean = false,
@@ -62,7 +64,8 @@ private data class ExtPrefs(
 
 private data class WakePrefs(
     val wakeWordEnabled: Boolean,
-    val porcupineKey: String
+    val porcupineKey: String,
+    val shakeEnabled: Boolean
 )
 
 private data class PrivacyPrefs(
@@ -118,6 +121,7 @@ class SettingsViewModel @Inject constructor(
         combine(
             prefs.isWakeWordEnabled,
             prefs.porcupineAccessKey,
+            prefs.isShakeEnabled,
             ::WakePrefs
         ),
         combine(
@@ -149,6 +153,7 @@ class SettingsViewModel @Inject constructor(
             }.getOrDefault(emptyList()),
             isWakeWordEnabled = wake.wakeWordEnabled,
             porcupineKey = wake.porcupineKey,
+            isShakeEnabled = wake.shakeEnabled,
             privacyMode = privacy.privacyMode,
             saveHistory = privacy.saveHistory,
             cloudMessagesToday = privacy.cloudMsgCount,
@@ -234,6 +239,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setPorcupineKey(key: String) = viewModelScope.launch { prefs.setPorcupineKey(key) }
+
+    fun setShakeEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setShakeEnabled(enabled)
+            val intent = Intent(context, ShakeDetectorService::class.java)
+            if (enabled) context.startForegroundService(intent) else context.stopService(intent)
+        }
+    }
 
     // ── Privacy ───────────────────────────────────────────────────────────
     fun setPrivacyMode(mode: String) = viewModelScope.launch { prefs.setPrivacyMode(mode) }

@@ -370,6 +370,21 @@ fun SettingsScreen(
                 }
             }
 
+            // ── Shake to Activate ────────────────────────────────────────
+            SettingsSection(title = "Shake to Activate") {
+                ShieldToggleRow(
+                    label = "Shake phone to open Guardian Angel",
+                    isOn = state.isShakeEnabled,
+                    onToggle = { viewModel.setShakeEnabled(it) }
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Shake your phone firmly to instantly open Guardian Angel, even when the app is closed. Uses minimal battery.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+
             // ── Wake Word ────────────────────────────────────────────────
             SettingsSection(title = "Wake Word — 'Hey Guardian'") {
                 // Toggle row
