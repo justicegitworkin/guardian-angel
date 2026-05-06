@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical">
+
+    <!-- Title row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🛡️ Safe Companion"
+            android:textSize="16sp"
+            android:textColor="#1A3A5C"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Status text -->
+    <TextView
+        android:id="@+id/widget_status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Protected ✅"
+        android:textSize="14sp"
+        android:textColor="#388E3C"
+        android:layout_marginTop="4dp" />
+
+    <!-- Button row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical">
+
+        <!-- Shield toggle button -->
+        <Button
+            android:id="@+id/widget_toggle_button"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="Shields On"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/widget_button_bg"
+            android:layout_marginEnd="6dp" />
+
+        <!-- Push to Talk button -->
+        <Button
+            android:id="@+id/widget_talk_button"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="🎤 Talk"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/widget_button_talk_bg"
+            android:layout_marginStart="6dp" />
+    </LinearLayout>
+
+</LinearLayout>

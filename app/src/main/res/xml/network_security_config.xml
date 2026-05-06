@@ -1,6 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Part B3: Strict TLS for all network traffic.
+
+  base-config disallows ANY cleartext traffic app-wide. Each upstream service
+  Safe Companion calls is also listed explicitly with trust-anchors=system, so
+  user-installed CA certs cannot be used to intercept these flows on managed
+  devices.
+
+  Certificate pin-sets were planned here but deferred until the pin hashes can
+  be extracted from the live endpoints at build time. Cleartext=false + system
+  trust anchors is the minimum-required hardening from the audit.
+-->
 <network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">api.anthropic.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.elevenlabs.io</domain>
+        <domain includeSubdomains="true">elevenlabs.io</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">texttospeech.googleapis.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
     </domain-config>
 </network-security-config>

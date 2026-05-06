@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GuardianAngel"
+rootProject.name = "SafeHarborSecurity"
 include(":app")

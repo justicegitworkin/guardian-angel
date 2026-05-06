@@ -1,12 +1,14 @@
-# Guardian Angel
+# Safe Harbor Security
 
-An AI-powered Android app that protects elderly users from scam calls, fraudulent SMS messages, and suspicious emails. Guardian Angel uses Claude AI to analyse incoming communications in real time and alert family members when threats are detected.
+An AI-powered Android app that protects elderly users from scam calls, fraudulent SMS messages, and suspicious emails. Safe Harbor Security uses Claude AI to analyse incoming communications in real time and alert family members when threats are detected.
 
 ## Features
 
 - **SMS Shield** — Automatically scans incoming text messages for scam patterns and flags suspicious content
 - **Call Shield** — Screens calls in real time using on-device transcription and AI analysis; overlays a warning banner during live calls
-- **Chat with Guardian** — A friendly AI companion the user can ask anything, with voice input and text-to-speech output
+- **Chat with Safe Harbor** — A friendly AI companion the user can ask anything, with voice input and text-to-speech output
+- **Listening Shield** — Detects apps that may be monitoring the microphone or conversations, with per-app remediation
+- **Is This Safe?** — Universal safety checker for photos, screenshots, clipboard text, URLs, and emails
 - **Family Alerts** — Notifies designated family contacts when a threat is detected
 - **Trusted Numbers** — Whitelist contacts that are never screened
 - **Accessible UI** — Large text option, clear visual design with high-contrast colours
@@ -64,25 +66,28 @@ On first launch you'll be guided through onboarding:
 | `FOREGROUND_SERVICE` | Keep call screening active during calls |
 | `POST_NOTIFICATIONS` | Alert the user and family contacts |
 | `SEND_SMS` | Send family alert messages |
+| `QUERY_ALL_PACKAGES` | Privacy monitor — detect listening apps |
 
 ## Project Structure
 
 ```
-app/src/main/java/com/guardianangel/app/
+app/src/main/java/com/safeharborsecurity/app/
 ├── data/
 │   ├── datastore/       # User preferences (API key, shield toggles, contacts)
-│   ├── local/           # Room database (messages, calls, alerts)
+│   ├── local/           # Room database (messages, calls, alerts, remediation)
 │   ├── remote/          # Retrofit Claude API client
 │   └── repository/      # Data access layer
 ├── di/                  # Hilt modules
 ├── receiver/            # SMS broadcast receiver
-├── service/             # Call screening + overlay services
+├── service/             # Call screening, overlay, privacy monitor services
 ├── ui/
-│   ├── chat/            # Guardian chat screen
+│   ├── chat/            # Safe Harbor chat screen
 │   ├── calls/           # Call log screen
 │   ├── home/            # Dashboard with shield toggles
 │   ├── messages/        # SMS alert screen
 │   ├── onboarding/      # First-run setup
+│   ├── privacy/         # Listening Shield + remediation
+│   ├── safety/          # Is This Safe? checker
 │   └── settings/        # API key, contacts, preferences
 └── util/                # Family alert manager, text utilities
 ```

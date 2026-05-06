@@ -1,13 +1,46 @@
+# --- Gradle / Android build ---
 *.iml
+.gradle/
 .gradle
-/local.properties
-/.idea
-.DS_Store
 /build
+/build/
+build/
 app/build
+app/build/
 /captures
 .externalNativeBuild
 .cxx
+build-output.log
+
+# --- IDE ---
+/.idea
+.idea/
+*.iws
+.vscode/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Secrets — NEVER COMMIT ---
 local.properties
-# Never commit google-services.json with real values
-# app/google-services.json
+/local.properties
+keystore.properties
+*.jks
+*.keystore
+release.keystore
+debug.keystore
+fastlane/.env*
+
+# Firebase / Google services config — contains API keys.
+# Use google-services.json.template as the shared shape.
+app/google-services.json
+app/google-services-old.json
+app/google-services*.json
+
+# --- Claude / IDE local state ---
+.claude/settings.local.json
+
+# --- Misc generated ---
+screenshot.png
+new_icon*.png

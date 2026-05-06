@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="cache" path="." />
+    <!-- Diagnostic logs (LogCollector writes to cache/diagnostics/) -->
+    <cache-path name="diagnostics" path="diagnostics/" />
+</paths>

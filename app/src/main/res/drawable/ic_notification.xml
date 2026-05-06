@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- White shield outline for status bar -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M12,2 L21,7 L21,13 C21,18 17,22 12,24 C7,22 3,18 3,13 L3,7 Z" />
+
+    <!-- Small palm tree silhouette inside shield -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11.5,18 Q11.8,15 12,13 L13,13 Q12.8,15 12.5,18 Z" />
+
+    <!-- Palm fronds -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12.2,13 Q14,11 16,11.5 Q14,12 12.5,13 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12.2,13 Q10,11 8,11.5 Q10,12 11.8,13 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,13 Q11.5,11 11,9 Q12,11 12.5,13 Z" />
+
+</vector>

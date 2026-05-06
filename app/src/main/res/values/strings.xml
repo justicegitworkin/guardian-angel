@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Guardian Angel</string>
+    <string name="app_name">Safe Companion</string>
     <string name="nav_home">Home</string>
     <string name="nav_calls">Calls</string>
     <string name="nav_messages">Messages</string>
-    <string name="nav_guardian">Guardian</string>
+    <string name="nav_safe_harbor">Safe Companion</string>
     <string name="nav_settings">Settings</string>
 
-    <string name="guardian_greeting">Hello! I\'m your Guardian Angel. I\'m here to keep you safe and answer any questions. What\'s on your mind?</string>
-    <string name="home_all_clear">All clear! Guardian Angel is watching over you 🛡️</string>
-    <string name="error_api_thinking">Guardian is thinking… try again in a moment.</string>
-    <string name="error_no_internet">Guardian needs internet to help. Please check your WiFi or data.</string>
+    <string name="safeharbor_greeting">Hello! I\'m Safe Companion, your security companion. I\'m here to keep you safe and answer any questions. What\'s on your mind?</string>
+    <string name="home_all_clear">All clear! Safe Companion is watching over you 🛡️</string>
+    <string name="error_api_thinking">Safe Companion is thinking… try again in a moment.</string>
+    <string name="error_no_internet">Safe Companion needs internet to help. Please check your WiFi or data.</string>
     <string name="notification_suspicious_text">⚠️ Suspicious Text Detected</string>
     <string name="action_block_sender">Block Sender</string>
-    <string name="action_ask_guardian">Ask Guardian</string>
-    <string name="channel_alerts_name">Guardian Alerts</string>
-    <string name="channel_alerts_description">Scam and safety alerts from Guardian Angel</string>
+    <string name="action_ask_safe_harbor">Ask Safe Companion</string>
+    <string name="channel_alerts_name">Safe Companion Alerts</string>
+    <string name="channel_alerts_description">Scam and safety alerts from Safe Companion</string>
     <string name="channel_call_name">Call Screening</string>
-    <string name="channel_call_description">Guardian Angel call screening notifications</string>
+    <string name="channel_call_description">Safe Companion call screening notifications</string>
+    <string name="payment_warning_description">Safe Companion uses this to remind you to be careful when you open payment apps like Venmo, Zelle, or Cash App.</string>
+    <string name="gmail_web_client_id">968852496971-mdt28l6da5bt51mh265reb28pc7s3e1s.apps.googleusercontent.com</string>
 </resources>

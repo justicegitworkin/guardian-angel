@@ -7,4 +7,5 @@
     <color name="warning_amber">#F57C00</color>
     <color name="safe_green">#388E3C</color>
     <color name="text_primary">#1A2030</color>
+    <color name="ic_launcher_background">#0D1B2A</color>
 </resources>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Safe Companion — Privacy Policy</title>
+    <style>
+        body { font-family: -apple-system, Roboto, system-ui, sans-serif; padding: 20px; line-height: 1.5; color: #1a1a1a; max-width: 720px; margin: 0 auto; background: #f5f7fa; }
+        h1 { color: #1A3A5C; margin-top: 0; }
+        h2 { color: #1A3A5C; margin-top: 28px; }
+        h3 { color: #1A3A5C; }
+        ul { padding-left: 22px; }
+        li { margin-bottom: 6px; }
+        .updated { color: #546E7A; font-size: 0.9em; }
+        .highlight { background: #FFF3E0; padding: 10px 14px; border-radius: 8px; border-left: 4px solid #F57C00; }
+    </style>
+</head>
+<body>
+    <h1>Safe Companion — Privacy Policy</h1>
+    <p class="updated">Last updated: 2026-04-26</p>
+
+    <p>Safe Companion is built to help senior users avoid scams. Privacy is core to that mission. This policy describes exactly what data the app uses, how it is processed, and what we never do.</p>
+
+    <div class="highlight">
+        <strong>Plain-English summary:</strong>
+        Safe Companion analyses scam-detection signals on your device. The only time message text is sent off the device is when the on-device classifier is uncertain AND you have configured a Claude API key — in which case the text snippet is sent to Anthropic for analysis. No identifiers, contacts, location, or message content are sent to Safe Companion's developers, ever.
+    </div>
+
+    <h2>What Safe Companion accesses on your device</h2>
+    <ul>
+        <li><strong>Notifications</strong> — to read incoming SMS and email previews so it can warn you about scams. Reads only; never modifies.</li>
+        <li><strong>Contacts</strong> — to recognise calls and texts from people you already know.</li>
+        <li><strong>Phone state</strong> — to detect when a flagged call begins/ends so a family alert can be sent if it lasts a long time.</li>
+        <li><strong>Microphone</strong> — only when you tap the voice button or run the room ultrasonic scan.</li>
+        <li><strong>Camera</strong> — only when you take a photo to be analysed or scan a QR code.</li>
+        <li><strong>Location (coarse + fine)</strong> — required by Android to read nearby WiFi network names; we do not store or send your location anywhere.</li>
+        <li><strong>Bluetooth scan</strong> — only during a Room Scan, to look for devices with suspicious names.</li>
+        <li><strong>Installed apps list</strong> — the App Checker scans installed packages to flag risky permissions; the list never leaves your device.</li>
+        <li><strong>Usage access</strong> (optional) — used only to detect when a payment app comes to the foreground, so we can show a safety reminder.</li>
+        <li><strong>SMS sending</strong> — used only to text the family contacts you have configured, when a high-risk scam pattern is detected. Each message goes to the numbers you entered yourself; we do not send to any other recipient.</li>
+    </ul>
+
+    <h2>Data sent off your device</h2>
+    <h3>Anthropic (Claude API) — only with your API key, only for ambiguous cases</h3>
+    <p>If you configure a Claude API key, message snippets that the on-device classifier marks "needs further analysis" are sent to <code>api.anthropic.com</code> for a verdict. We do not include your phone number, contacts, or device identifiers. Anthropic processes the request under their privacy policy and does not retain prompts beyond their session window. If you do not configure a key, nothing is sent.</p>
+
+    <h3>ElevenLabs — only with your API key, only for voice playback</h3>
+    <p>If you configure an ElevenLabs API key, the agent's reply text is sent to <code>api.elevenlabs.io</code> to synthesise a natural voice. No personal data is included.</p>
+
+    <h3>Google Cloud Text-to-Speech — only with your API key, fallback voice tier</h3>
+    <p>Same pattern as ElevenLabs. Only the reply text and your key. Optional.</p>
+
+    <h3>RSS feeds — read-only, anonymous</h3>
+    <p>The Security News feed pulls public RSS articles from AARP, FTC, FBI, BBB, and Snopes. These are anonymous HTTP requests; no identifiers attached.</p>
+
+    <h2>What Safe Companion never does</h2>
+    <ul>
+        <li>Sell or share your data with advertisers, data brokers, or analytics SDKs.</li>
+        <li>Upload your contacts, call log, location, or photos.</li>
+        <li>Run trackers, ad networks, or third-party SDKs beyond the optional API services listed above.</li>
+        <li>Record your phone calls or store audio.</li>
+    </ul>
+
+    <h2>On-device storage</h2>
+    <p>Scam alerts, call screening logs, and your settings are stored locally in an encrypted Room database. API keys are encrypted with AES/GCM in the Android Keystore — they never leave your device in plaintext. Backup is disabled, so a stolen device backup will not contain Safe Companion data.</p>
+
+    <h2>Children</h2>
+    <p>Safe Companion is designed for adults (age 18+) and is not directed at children.</p>
+
+    <h2>Your rights</h2>
+    <p>You can clear all stored data at any time from Settings → Clear All Data. Removing the app removes all local data. There is no server-side account, so there is nothing to delete on our end.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about privacy? Email <a href="mailto:privacy@safecompanion.app">privacy@safecompanion.app</a>.</p>
+</body>
+</html>

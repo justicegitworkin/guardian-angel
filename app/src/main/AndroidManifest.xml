@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Internet -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- SMS -->
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- SMS (send only — reading is done via NotificationListenerService) -->
     <uses-permission android:name="android.permission.SEND_SMS" />
 
     <!-- Phone / Calls -->
+    <!-- READ_PHONE_STATE is OPTIONAL: only used by CallDurationTracker for in-call duration alerts.
+         All call screening is done via the official CallScreeningService API, which does not require
+         READ_CALL_LOG or ANSWER_PHONE_CALLS. Those two restricted permissions have been removed. -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
 
     <!-- Microphone / Voice -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -37,14 +37,69 @@
     <!-- Vibrate for notifications -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Full-screen intent for grab-attention alerts -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- WiFi Security Monitor -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Bluetooth (for hidden device scanner + AirTag/tracker scanner).
+         CRITICAL: usesPermissionFlags="neverForLocation" on Android 12+ tells
+         the system we don't derive location data from BLE scans, so scans
+         return results without requiring ACCESS_FINE_LOCATION at runtime.
+         Without this flag, BLE scans silently return an empty list on
+         modern Android — the scan starts, no error fires, but no results
+         arrive. (This was the AirTag-not-detected bug.) -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Camera (for Safety Checker photo scanning) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- NFC Security Monitor -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
+    <!-- Privacy Monitor + App Checker: query installed packages -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <!-- App Checker: detect recently used app for "What's This App?" -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- App Checker: launch system uninstall dialog -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <!-- Privacy Monitor: special apps foreground service type -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Item 2 (Screen Monitor): MediaProjection consent gives on-device OCR
+         capability so we can detect SMS scams and payment-app launches WITHOUT
+         BIND_NOTIFICATION_LISTENER_SERVICE or PACKAGE_USAGE_STATS — both of
+         which are gated behind Android's hostile "restricted setting" flow on
+         Android 13+. The MediaProjection consent dialog is the friendly one
+         users actually understand. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
+    <!-- Auto-start on boot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
-        android:name=".GuardianAngelApp"
-        android:allowBackup="true"
+        android:name=".SafeHarborApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.GuardianAngel"
+        android:theme="@style/Theme.SafeHarbor"
         android:usesCleartextTraffic="false"
         android:networkSecurityConfig="@xml/network_security_config">
 
@@ -52,7 +107,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.GuardianAngel"
+            android:theme="@style/Theme.SafeHarbor"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -62,23 +117,58 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="guardianangel" />
+                <data android:scheme="safeharbor" />
+            </intent-filter>
+            <!-- Share target: "Check This Message" from any app -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/html" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
 
-        <!-- SMS Broadcast Receiver -->
-        <receiver
-            android:name=".receiver.SmsReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="1000">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+        <!-- Notification Listener for SMS scanning — DISABLED (Item 2).
+             Replaced by ScreenScanService (MediaProjection + on-device OCR), which
+             does not require the intimidating "restricted setting" flow that
+             BIND_NOTIFICATION_LISTENER_SERVICE forces users through on Android 13+.
+
+             We keep the class file for now (in case we need to re-enable for an
+             A/B test) but android:enabled="false" stops the system from binding
+             to it. Safe to delete in a follow-up cleanup pass. -->
+        <service
+            android:name=".service.SafeHarborNotificationListener"
+            android:enabled="false"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
-        </receiver>
+        </service>
+
+        <!-- Item 2: Screen Monitor foreground service. Holds the MediaProjection
+             token granted by the user via the standard system consent dialog,
+             grabs frames at low frequency, runs ML Kit on-device OCR, throws
+             the bitmap away, and pipes the extracted text through
+             OnDeviceScamClassifier. Replaces both NotificationListener-based SMS
+             scanning AND UsageStats-based payment-app detection. -->
+        <service
+            android:name=".service.ScreenScanService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
         <!-- Call Screening Service -->
         <service
-            android:name=".service.GuardianCallScreeningService"
+            android:name=".service.SafeHarborCallScreeningService"
             android:exported="true"
             android:permission="android.permission.BIND_SCREENING_APP_ROLE">
             <intent-filter>
@@ -92,14 +182,110 @@
             android:exported="false"
             android:foregroundServiceType="phoneCall" />
 
-        <!-- Notification action receiver (block sender from notification) -->
+        <!-- Privacy Monitor Foreground Service -->
+        <service
+            android:name=".service.PrivacyMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <!-- FileProvider for camera photos -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Disable default WorkManager initializer (we use Configuration.Provider) -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+        <!-- Payment Warning: replaced by PaymentAppMonitor (UsageStatsManager) wired into
+             GuardianService. The previous AccessibilityService approach was removed because
+             Google Play restricts accessibility services to apps whose core function is
+             accessibility for users with disabilities. -->
+
+        <!-- WiFi Security Monitor -->
+        <receiver
+            android:name=".receiver.WifiStateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.wifi.STATE_CHANGE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification action receiver (block sender, trust WiFi, dismiss) -->
         <receiver
             android:name=".receiver.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.guardianangel.app.ACTION_BLOCK_SENDER" />
+                <action android:name="com.safeharborsecurity.app.ACTION_BLOCK_SENDER" />
+                <action android:name="com.safeharborsecurity.app.ACTION_TRUST_WIFI" />
+                <action android:name="com.safeharborsecurity.app.ACTION_DISMISS_NOTIF" />
             </intent-filter>
         </receiver>
+
+        <!-- Guardian Background Service -->
+        <service
+            android:name=".service.GuardianService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="security_monitoring" />
+        </service>
+
+        <!-- Auto-start on boot -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- New app install auto-check -->
+        <receiver
+            android:name=".receiver.PackageInstallReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Home Screen Widget -->
+        <receiver
+            android:name=".widget.SafeHarborWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- Full-screen alert for urgent scam warnings -->
+        <activity
+            android:name=".ui.alert.GrabAttentionActivity"
+            android:exported="false"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.SafeHarbor" />
 
     </application>
 
