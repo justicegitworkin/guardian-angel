@@ -166,11 +166,17 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
-        <!-- Call Screening Service -->
+        <!-- Call Screening Service.
+             android:permission MUST be android.permission.BIND_SCREENING_SERVICE —
+             that is what the OS grants to the binding process when it talks to
+             this service. Earlier this was the typo BIND_SCREENING_APP_ROLE
+             (not a real Android permission), which caused the system to treat
+             the service as malformed and silently exclude Safe Companion from
+             the Settings → Default apps → Caller ID & spam picker. -->
         <service
             android:name=".service.SafeHarborCallScreeningService"
             android:exported="true"
-            android:permission="android.permission.BIND_SCREENING_APP_ROLE">
+            android:permission="android.permission.BIND_SCREENING_SERVICE">
             <intent-filter>
                 <action android:name="android.telecom.CallScreeningService" />
             </intent-filter>

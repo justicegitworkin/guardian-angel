@@ -144,20 +144,47 @@ class SafeHarborChatViewModel @Inject constructor(
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val audioHandler = Handler(Looper.getMainLooper())
     private var savedMusicVolume: Int = -1
+    private var savedNotificationVolume: Int = -1
+    private var savedSystemVolume: Int = -1
 
+    /**
+     * Mute every stream the SpeechRecognizer "I'm listening / I stopped"
+     * tones might play through. STREAM_MUSIC alone wasn't enough — the
+     * recognizer's "blip blip" lives on STREAM_NOTIFICATION and STREAM_SYSTEM
+     * on most OEM builds, which is why testers reported on/off beeping every
+     * time we destroy+recreate the recognizer between accumulated turns.
+     */
     private fun muteBeepTone() {
         try {
-            savedMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
+            if (savedMusicVolume < 0) {
+                savedMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
+            }
+            if (savedNotificationVolume < 0) {
+                savedNotificationVolume = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)
+                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 0, 0)
+            }
+            if (savedSystemVolume < 0) {
+                savedSystemVolume = audioManager.getStreamVolume(AudioManager.STREAM_SYSTEM)
+                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, 0, 0)
+            }
         } catch (_: Exception) {}
     }
 
-    private fun restoreVolumeDelayed(delayMs: Long = 400L) {
+    private fun restoreVolumeDelayed(delayMs: Long = 600L) {
         audioHandler.postDelayed({
             try {
                 if (savedMusicVolume >= 0) {
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, savedMusicVolume, 0)
                     savedMusicVolume = -1
+                }
+                if (savedNotificationVolume >= 0) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, savedNotificationVolume, 0)
+                    savedNotificationVolume = -1
+                }
+                if (savedSystemVolume >= 0) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, savedSystemVolume, 0)
+                    savedSystemVolume = -1
                 }
             } catch (_: Exception) {}
         }, delayMs)
@@ -602,6 +629,10 @@ class SafeHarborChatViewModel @Inject constructor(
 
         transitionTo(AgentState.LISTENING)
 
+        // Mute system streams BEFORE destroying / creating the recognizer
+        // so the OEM "blip" tones don't fire. onReadyForSpeech below restores
+        // them once the recognizer is ready and the start beep has passed.
+        muteBeepTone()
         speechRecognizer?.destroy()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(appContext).apply {
             setRecognitionListener(object : RecognitionListener {
@@ -651,6 +682,13 @@ class SafeHarborChatViewModel @Inject constructor(
                             partialSpeechText = accumulatedSpeechText
                         )
                     }
+
+                    // CRITICAL: mute the system tones BEFORE destroying the
+                    // recognizer. Otherwise testers hear a constant "blip blip"
+                    // every time we cycle the recognizer between accumulated
+                    // utterances. The 900ms restore window covers both the
+                    // destroy beep and the new recognizer's startListening beep.
+                    muteBeepTone()
                     speechRecognizer?.destroy()
                     speechRecognizer = null
 
@@ -665,6 +703,7 @@ class SafeHarborChatViewModel @Inject constructor(
                             }
                         }
                     }
+                    restoreVolumeDelayed(900L)
                 }
 
                 override fun onError(error: Int) {
@@ -802,6 +841,12 @@ class SafeHarborChatViewModel @Inject constructor(
      *  recognizer prematurely "completes." */
     private fun continueListening() {
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) return
+        // Same mute-the-blip trick as in startVoiceTurn — testers reported
+        // a constant on/off beeping pattern any time the conversation went
+        // into accumulate-and-restart mode (i.e. every couple seconds during
+        // a normal turn). The 900ms restore window in onResults covers the
+        // restart beep too, so this call is mostly defensive.
+        muteBeepTone()
         try {
             speechRecognizer?.cancel()
             speechRecognizer?.destroy()
