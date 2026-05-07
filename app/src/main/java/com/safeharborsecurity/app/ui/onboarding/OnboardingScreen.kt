@@ -1986,18 +1986,25 @@ private fun TestDrivePage(userName: String, onComplete: () -> Unit) {
             // system "Add to Home Screen?" dialog via ShortcutManagerCompat.
             // Most launchers (Pixel, Samsung, Nova) support this; the few
             // that don't will simply ignore the call with no harm done.
-            OutlinedButton(
+            //
+            // Filled SafeGreen for visibility — testers were missing the
+            // outlined version because it blended into the screen.
+            Button(
                 onClick = { requestPinToHomeScreen(pinContext) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SafeGreen,
+                    contentColor = Color.White
+                )
             ) {
-                Icon(Icons.Default.Home, contentDescription = null, tint = NavyBlue)
+                Icon(Icons.Default.Home, contentDescription = null, tint = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Add Safe Companion to my Home screen",
-                    color = NavyBlue,
+                    color = Color.White,
                     style = MaterialTheme.typography.titleSmall
                 )
             }

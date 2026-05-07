@@ -123,8 +123,21 @@ class SafeHarborChatViewModel @Inject constructor(
     private var initialSpeechTimerJob: Job? = null
     private var midSpeechTimerJob: Job? = null
     private var watchdogTimerJob: Job? = null
+    private var silenceTickerJob: Job? = null
     private var lastPartialResult: String = ""
     private var hasUserStartedSpeaking: Boolean = false
+
+    // Wall-clock millis of the last NON-EMPTY partial result the recognizer
+    // delivered. The silence ticker compares this against now() once per
+    // second to decide when the user has actually stopped talking. Using a
+    // timestamp instead of a coroutine job means the budget can't be reset
+    // by recognizer cycles, onBeginningOfSpeech triggered by background
+    // noise, or anything else that fires repeatedly during the turn.
+    @Volatile private var lastSpeechActivityMs: Long = 0L
+    // Tester tuning history: 12s felt sluggish, 8s was close, 7s landed.
+    // Still gives an older user a brief mid-thought pause while feeling
+    // responsive when they actually stop talking.
+    private val silenceBudgetMs = 7_000L
     /**
      * Tester feedback: Google's online recognizer cuts off after ~2s of
      * silence on most devices regardless of EXTRA_SPEECH_INPUT_*_LENGTH_MILLIS,
@@ -391,9 +404,9 @@ class SafeHarborChatViewModel @Inject constructor(
      * PERMANENTLY DISABLED — kept for future AEC-based re-enablement. See
      * the long-form rationale on [startInterruptListenerDelayed].
      */
+    @Suppress("UNREACHABLE_CODE", "FunctionName")
     private fun startInterruptListener() {
         return  // disabled — see startInterruptListenerDelayed() doc
-        @Suppress("UNREACHABLE_CODE")
         if (_uiState.value.agentState != AgentState.SPEAKING) return
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) return
 
@@ -661,6 +674,7 @@ class SafeHarborChatViewModel @Inject constructor(
                         _uiState.update { it.copy(inputText = partialText, partialSpeechText = partialText,
                             patientSubtext = "Keep going, I'm following you...") }
                         startMidSpeechTimer()
+                        markSpeechActivity()  // bookkeeping for the silence ticker
                     }
                 }
 
@@ -779,6 +793,9 @@ class SafeHarborChatViewModel @Inject constructor(
         muteBeepTone()
         speechRecognizer?.startListening(recognizerIntent)
         startWatchdogTimer()
+        // Robust silence detection that survives recognizer cycles.
+        lastSpeechActivityMs = 0L
+        startSilenceTicker()
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -797,6 +814,48 @@ class SafeHarborChatViewModel @Inject constructor(
                 onSilenceDetected()
             }
         }
+    }
+
+    /**
+     * Note bookkeeping: speech happened just now. The silence ticker reads
+     * lastSpeechActivityMs. Call this from onPartialResults whenever
+     * non-empty text comes in, AND from anywhere else that should reset
+     * the budget (e.g. user-typed text being added during voice mode).
+     */
+    private fun markSpeechActivity() {
+        lastSpeechActivityMs = System.currentTimeMillis()
+    }
+
+    /**
+     * Robust silence detector. Replaces the coroutine-job mid-speech timer
+     * which was getting reset by every recognizer cycle and every
+     * onBeginningOfSpeech (noise can trigger that without real speech).
+     * This ticker runs once per second while LISTENING and submits when
+     * the user has been silent past silenceBudgetMs since their last real
+     * partial result. Cancelled in stopVoiceTurn / onSilenceDetected /
+     * any state transition out of LISTENING.
+     */
+    private fun startSilenceTicker() {
+        silenceTickerJob?.cancel()
+        silenceTickerJob = viewModelScope.launch {
+            while (_uiState.value.agentState == AgentState.LISTENING) {
+                delay(1000)
+                val activity = lastSpeechActivityMs
+                if (activity == 0L) continue  // no speech yet; let initial timer handle
+                val elapsed = System.currentTimeMillis() - activity
+                if (elapsed >= silenceBudgetMs && _uiState.value.agentState == AgentState.LISTENING) {
+                    Log.d(TAG, "Voice: silence ticker — ${elapsed}ms since last partial, submitting")
+                    submitAccumulatedAndStop()
+                    return@launch
+                }
+            }
+        }
+    }
+
+    private fun stopSilenceTicker() {
+        silenceTickerJob?.cancel()
+        silenceTickerJob = null
+        lastSpeechActivityMs = 0L
     }
 
     private fun startMidSpeechTimer() {
@@ -873,7 +932,17 @@ class SafeHarborChatViewModel @Inject constructor(
         val callback = object : RecognitionListener {
             override fun onReadyForSpeech(p: Bundle?) {
                 restoreVolumeDelayed()
-                startMidSpeechTimer()  // reset silence budget
+                // CRITICAL: do NOT reset the mid-speech silence timer here.
+                // startListenerOnly fires every time onResults cycles the
+                // recognizer (every 5-7s during normal speech). Resetting
+                // the timer on every recognizer recreate meant the 12s
+                // silence budget never elapsed — the assistant just kept
+                // listening forever. Only seed the timer if there isn't
+                // already one running, so a fresh-start path (no partials
+                // arriving yet) still gets a stop budget.
+                if (midSpeechTimerJob?.isActive != true) {
+                    startMidSpeechTimer()
+                }
             }
             override fun onBeginningOfSpeech() {
                 hasUserStartedSpeaking = true
@@ -887,6 +956,7 @@ class SafeHarborChatViewModel @Inject constructor(
                         else "$accumulatedSpeechText $partialText"
                     _uiState.update { it.copy(inputText = display, partialSpeechText = display) }
                     startMidSpeechTimer()
+                    markSpeechActivity()  // bookkeeping for silence ticker
                 }
             }
             override fun onResults(results: Bundle?) {
@@ -947,12 +1017,15 @@ class SafeHarborChatViewModel @Inject constructor(
     private fun startWatchdogTimer() {
         watchdogTimerJob?.cancel()
         watchdogTimerJob = viewModelScope.launch {
-            // Absolute upper bound on a single utterance. Bumped to 35s now
-            // that we accumulate text across recognizer restarts — the user
-            // can string together multiple thoughts and the mid-speech 12s
-            // timer is the per-pause limit. 35s caps the whole turn.
-            delay(35000)
-            Log.d(TAG, "Voice: watchdog fired (35s absolute limit)")
+            // Absolute upper bound on a single utterance. Reduced 35s → 22s
+            // because tester reported 20-30s perceived timeouts felt like
+            // the agent had hung. 22s still lets a slow-speaking user string
+            // 2-3 thoughts together without being cut off, while feeling
+            // responsive when the silence ticker (8s) hasn't fired for
+            // some reason (e.g. background-noise false partials kept
+            // resetting it). The silence ticker is the primary stopper.
+            delay(22000)
+            Log.d(TAG, "Voice: watchdog fired (22s absolute limit)")
             if (_uiState.value.agentState == AgentState.LISTENING) {
                 submitAccumulatedAndStop()
             }
@@ -966,6 +1039,10 @@ class SafeHarborChatViewModel @Inject constructor(
         initialSpeechTimerJob = null
         midSpeechTimerJob = null
         watchdogTimerJob = null
+        // The new timestamp-based silence ticker also has to die when
+        // we leave the LISTENING state — otherwise it keeps polling and
+        // could submit after the agent has already started speaking.
+        stopSilenceTicker()
     }
 
     private fun onSilenceDetected() {
@@ -1162,6 +1239,18 @@ class SafeHarborChatViewModel @Inject constructor(
         val personaId = _uiState.value.persona.name
         currentAgentSpeech = text
 
+        // Force-restore audio streams BEFORE we hand off to voiceManager.
+        // The mute helpers in the recognizer cycle save+zero STREAM_MUSIC /
+        // NOTIFICATION / SYSTEM. If any cycle finished without onReadyForSpeech
+        // firing (e.g. ERROR_CLIENT, fast cancel, or text-Send path that never
+        // entered LISTENING), the saved-volume guard could leave the streams
+        // at zero. ElevenLabs plays MP3 through STREAM_MUSIC, so a leaked
+        // mute makes it inaudible — which the voice manager interprets as
+        // "no audio played" and a tester perceives as "the voice changed
+        // back to Android TTS." Restoring synchronously here is the safety
+        // net the helpers don't always provide.
+        forceRestoreStreams()
+
         // Fix 30: Transition to SPEAKING — this kills all recognizers first
         transitionTo(AgentState.SPEAKING)
 
@@ -1169,6 +1258,28 @@ class SafeHarborChatViewModel @Inject constructor(
             voiceManager.speak(text, personaId)
             // When voiceManager.isSpeaking becomes false, the observer triggers SPEAK_COOLDOWN
         }
+    }
+
+    /** Synchronously restore any system streams the muteBeepTone helper
+     *  may have zeroed and not yet restored. Used as a defensive safety
+     *  net at every PROCESSING/SPEAKING transition. Cancels any pending
+     *  delayed restoration too, so the next mute starts from a clean state. */
+    private fun forceRestoreStreams() {
+        try {
+            audioHandler.removeCallbacksAndMessages(null)
+            if (savedMusicVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, savedMusicVolume, 0)
+                savedMusicVolume = -1
+            }
+            if (savedNotificationVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, savedNotificationVolume, 0)
+                savedNotificationVolume = -1
+            }
+            if (savedSystemVolume >= 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_SYSTEM, savedSystemVolume, 0)
+                savedSystemVolume = -1
+            }
+        } catch (_: Exception) {}
     }
 
     fun previewPersonaVoice(persona: ChatPersona) {

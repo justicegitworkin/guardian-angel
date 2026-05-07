@@ -219,6 +219,12 @@ class SafeHarborApp : Application(), Configuration.Provider {
         val manager = getSystemService(NotificationManager::class.java)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Force-recreate the Listening Shield channel so existing testers
+            // who already had it created at IMPORTANCE_LOW get the new MIN
+            // behaviour. Android keeps user-set importance after the first
+            // creation, so the only reliable way to push down the noise
+            // level is to delete + recreate.
+            try { manager.deleteNotificationChannel(CHANNEL_PRIVACY) } catch (_: Exception) {}
             val channels = listOf(
                 NotificationChannel(
                     CHANNEL_ALERTS,
@@ -238,9 +244,20 @@ class SafeHarborApp : Application(), Configuration.Provider {
                 NotificationChannel(
                     CHANNEL_PRIVACY,
                     "Listening Shield",
-                    NotificationManager.IMPORTANCE_LOW
+                    // IMPORTANCE_MIN: notification is required by Android for
+                    // any foreground service, but we want it as quiet as
+                    // legally possible. MIN means: no sound, no vibration,
+                    // no heads-up, and on most launchers just a small icon
+                    // in the status bar. Tester complained that turning the
+                    // shield on every time fired a useless pop-up — this
+                    // suppresses it.
+                    NotificationManager.IMPORTANCE_MIN
                 ).apply {
                     description = "Listening Shield background monitoring"
+                    setShowBadge(false)
+                    setSound(null, null)
+                    enableLights(false)
+                    enableVibration(false)
                 },
                 NotificationChannel(
                     CHANNEL_CHECKIN,

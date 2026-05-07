@@ -39,7 +39,11 @@
       "Read(//c/Android/Sdk/platform-tools/**)",
       "Read(//c/Users/steve/**)",
       "Bash(/c/Users/steve/AppData/Local/Android/Sdk/platform-tools/adb.exe devices *)",
-      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew assembleBetaDebug)"
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew assembleBetaDebug)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew.bat assembleStandardDebug)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew.bat installStandardDebug)",
+      "Bash(\"/c/Users/steve/AppData/Local/Android/Sdk/platform-tools/adb.exe\" devices *)",
+      "Bash(\"/c/Program Files/Android/Android Studio/jbr/../platform-tools/adb.exe\" devices)"
     ]
   }
 }

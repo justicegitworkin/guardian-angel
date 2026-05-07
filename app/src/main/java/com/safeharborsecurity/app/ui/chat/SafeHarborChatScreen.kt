@@ -146,10 +146,27 @@ fun SafeHarborChatScreen(
         }
     }
 
-    // Pre-fill context from notification deep-link
+    // Auto-submit the alert context when launched from a "Tell Me More" tap.
+    // Previous behaviour only stuffed the raw text into the input box, leaving
+    // the user to tap Send themselves — which testers didn't realise they had
+    // to do, so the agent answered with a generic "tell me what the message
+    // said" prompt. Now we frame the alert content as a help request and
+    // submit it automatically with speakResponse=true so the agent reads its
+    // analysis aloud.
+    var contextSubmitted by remember { mutableStateOf(false) }
     LaunchedEffect(initialContext) {
-        if (initialContext.isNotBlank()) {
-            viewModel.onInputChange(initialContext)
+        if (initialContext.isNotBlank() && !contextSubmitted) {
+            contextSubmitted = true
+            val framed = buildString {
+                append("I just received this and I'm worried it might be a scam. ")
+                append("Can you walk me through whether this is dangerous, ")
+                append("what kind of scam this looks like, and what I should do? ")
+                append("Here is exactly what it said:\n\n")
+                append("\"")
+                append(initialContext.trim())
+                append("\"")
+            }
+            viewModel.sendMessage(text = framed, speakResponse = true)
         }
     }
 

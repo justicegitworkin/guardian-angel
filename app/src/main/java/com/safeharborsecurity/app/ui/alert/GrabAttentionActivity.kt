@@ -53,10 +53,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.safeharborsecurity.app.MainActivity
+import com.safeharborsecurity.app.data.datastore.UserPreferences
+import com.safeharborsecurity.app.data.model.ChatPersona
 import com.safeharborsecurity.app.ui.theme.SafeHarborTheme
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class GrabAttentionActivity : ComponentActivity() {
+
+    @Inject lateinit var userPreferences: UserPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -76,12 +86,27 @@ class GrabAttentionActivity : ComponentActivity() {
         val description = intent.getStringExtra("description") ?: "Something suspicious was detected."
         val threatLevel = intent.getStringExtra("threatLevel") ?: "HIGH"
 
+        // Read the user's selected persona once at activity start so the
+        // "Tell Me More" button can show that persona's avatar emoji —
+        // a clearer visual cue that tapping it opens the voice assistant.
+        // runBlocking is fine here: this only runs when the alert fires
+        // (rare, user-initiated) and we need the value before composition.
+        val personaEmoji: String = try {
+            runBlocking {
+                val name = userPreferences.chatPersona.first()
+                ChatPersona.fromName(name).emoji
+            }
+        } catch (_: Exception) {
+            ChatPersona.JAMES.emoji  // safe default — JAMES is the app default persona
+        }
+
         setContent {
             SafeHarborTheme {
                 GrabAttentionScreen(
                     title = title,
                     description = description,
                     threatLevel = threatLevel,
+                    personaEmoji = personaEmoji,
                     onDismiss = { finish() },
                     onTellMeMore = {
                         val mainIntent = Intent(
@@ -110,6 +135,7 @@ private fun GrabAttentionScreen(
     title: String,
     description: String,
     threatLevel: String,
+    personaEmoji: String,
     onDismiss: () -> Unit,
     onTellMeMore: () -> Unit
 ) {
@@ -288,7 +314,11 @@ private fun GrabAttentionScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Tell Me More button (secondary, large)
+            // Tell Me More button (secondary, large).
+            // The leading glyph is the user's persona emoji (Grace / James /
+            // Sophie / George) instead of a generic Info icon — the user
+            // requested a stronger visual cue that this button leads them to
+            // a conversation with their voice assistant.
             Button(
                 onClick = onTellMeMore,
                 modifier = Modifier
@@ -300,10 +330,9 @@ private fun GrabAttentionScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Info,
-                    contentDescription = null,
-                    modifier = Modifier.size(28.dp)
+                Text(
+                    text = personaEmoji,
+                    fontSize = 28.sp
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(

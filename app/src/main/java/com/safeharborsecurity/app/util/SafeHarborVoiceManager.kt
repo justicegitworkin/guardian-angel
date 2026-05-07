@@ -144,6 +144,16 @@ class SafeHarborVoiceManager @Inject constructor(
         // Check C — Tier selection
         addDebugLine("Check C: Tier=$tier | mode=$mode | online=$online | elKeyBlank=${elevenLabsKey.isBlank()}")
 
+        // Mirror the tier diagnostics into logcat so "ElevenLabs not playing"
+        // reports can be debugged without needing the in-app debug panel.
+        // Never log the actual key — only its presence.
+        Log.d(
+            TAG,
+            "speak() tier=$tier mode=$mode online=$online " +
+                "elKeyPresent=${elevenLabsKey.isNotBlank()} " +
+                "googleKeyPresent=${googleKey.isNotBlank()}"
+        )
+
         when (tier) {
             VoiceTier.ELEVEN_LABS -> {
                 addDebugLine("ElevenLabs: calling API...")

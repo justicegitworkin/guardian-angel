@@ -102,8 +102,15 @@ class ElevenLabsTTSManager @Inject constructor(
                 throw Exception("ElevenLabs API error ${response.code}: $errorBody")
             }
 
-            // Save audio to temp file
-            val audioFile = File(appContext.cacheDir, "elevenlabs_audio.mp3")
+            // Save audio to a per-persona file. Tester report: tapping
+            // "James" preview sometimes played Sophie's voice — the race
+            // was that a single shared elevenlabs_audio.mp3 got overwritten
+            // by a later request while MediaPlayer was still reading it.
+            // One file per persona eliminates the collision. Same pattern
+            // also fixes intermittent fallback-to-Android-TTS, which was
+            // MediaPlayer erroring out mid-read against an overwritten file.
+            val safeName = personaId.lowercase().filter { it.isLetterOrDigit() }
+            val audioFile = File(appContext.cacheDir, "elevenlabs_audio_${safeName}.mp3")
             response.body?.byteStream()?.use { input ->
                 FileOutputStream(audioFile).use { output ->
                     input.copyTo(output)

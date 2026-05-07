@@ -90,7 +90,13 @@ class PrivacyMonitorService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Listening Shield is active")
             .setContentText("Safe Companion is watching for apps that might be listening")
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            // PRIORITY_MIN + setSilent: collapse to a tiny icon, never
+            // heads-up. setVisibility SECRET keeps it off the lock screen.
+            // Together with the channel's IMPORTANCE_MIN this is the
+            // quietest a foreground-service notification can legally be.
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setSilent(true)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
             .setContentIntent(pi)
             .build()
